@@ -567,6 +567,25 @@ func (m Model) View() string {
 	var allRows []RenderedRow
 	var currentSection string
 
+	// Stylized CATGEN Block Logo Banner
+	logoCatStyle := lipgloss.NewStyle().Foreground(colorTeal).Bold(true)
+	logoGenStyle := lipgloss.NewStyle().Foreground(colorPink).Bold(true)
+	subLogoStyle := lipgloss.NewStyle().Foreground(colorMuted)
+
+	allRows = append(allRows, RenderedRow{
+		isSection: true,
+		text:      " " + logoCatStyle.Render("█▀▀ ▄▀█ ▀█▀") + " " + logoGenStyle.Render("█▀▀ █▀▀ █▄ █"),
+	})
+	allRows = append(allRows, RenderedRow{
+		isSection: true,
+		text:      " " + logoCatStyle.Render("█▄▄ █▀█  █ ") + " " + logoGenStyle.Render("█▄█ ██▄ █ ▀█"),
+	})
+	allRows = append(allRows, RenderedRow{
+		isSection: true,
+		text:      subLogoStyle.Render(" ── ASCII Cat Studio ──"),
+	})
+	allRows = append(allRows, RenderedRow{isSection: true, text: ""})
+
 	for i, item := range m.menuItems {
 		if item.Section != currentSection {
 			if currentSection != "" {
@@ -668,7 +687,7 @@ func (m Model) View() string {
 	}
 	leftBody := strings.Join(visibleTextLines, "\n")
 
-	leftBox := buildFramedBox("Controls", leftBody, leftPaneW, contentH, colorBorder, colorTeal)
+	leftBox := buildFramedBox("CATGEN", leftBody, leftPaneW, contentH, colorBorder, colorTeal)
 
 	// --- Right Pane (Live Preview) ---
 	// Horizontally and vertically center the ASCII Cat
