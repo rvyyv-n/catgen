@@ -1,10 +1,10 @@
-# 🐾 CATGEN: Project Roadmap
+# CATGEN: Project Roadmap
 
 This document outlines the phased development plan for transforming the `cats` repository into **CATGEN**, an interactive ASCII Cat Studio and Web App.
 
 ---
 
-## ✅ Phase 1: The Core Terminal Engine (CLI & TUI) — `v1.0.0`
+## Phase 1: The Core Terminal Engine (CLI & TUI) — v1.0.0 [COMPLETED]
 **Goal**: Build a robust Go-based image-to-ASCII converter and an interactive BANGEN-style terminal user interface.
 
 - [x] **Core ASCII Converter**
@@ -13,19 +13,21 @@ This document outlines the phased development plan for transforming the `cats` r
   - [x] Add 24-bit TrueColor ANSI output and 6 color themes (Matrix, Cyberpunk, Amber, Ice Blue, Grayscale).
   - [x] Implement Auto-Fit dynamic constraint solver to prevent screen overflow.
   - [x] Live brightness, contrast, and inversion controls.
+  - [x] Discord-optimized 34-column codeblock formatter with 16-color ANSI support.
 - [x] **Interactive TUI Studio (Bubble Tea & Lipgloss)**
-  - [x] Build BANGEN-style 2-pane UI with embedded border titles and thin framing.
+  - [x] Build BANGEN-style 2-pane UI with embedded centered border titles and thin framing.
+  - [x] Add glowing dual-tone block ASCII CATGEN logo banner to sidebar.
   - [x] Left pane property controls with full-width solid teal selection highlights.
   - [x] Radio-button effect lists with smooth scrolling viewport.
-  - [x] Live preview right pane updating in real-time.
-  - [x] Action shortcuts: `r` for instant random cat, `e` for clean text export to `cat_ascii.txt`.
-  - [x] Full-width color-coded keybind footer.
+  - [x] Live preview right pane with horizontal & vertical image centering.
+  - [x] Action shortcuts: `r` for instant random cat, `e` for plain text export, `d` for Discord export.
+  - [x] Right-aligned color-coded keybind footer.
 - [x] **CLI Mode**
-  - [x] Add `--cli`, `--width`, `--color`, `--invert`, and `--file` flags for headless terminal generation.
+  - [x] Add `--cli`, `--discord`, `--width`, `--color`, `--invert`, and `--file` flags for headless terminal generation.
 
 ---
 
-## ⏳ Phase 2: Server Integrations (`curl` Mode & API)
+## Phase 2: Server Integrations (`curl` Mode & API) [UP NEXT]
 **Goal**: Connect the ASCII engine to the HTTP server for instant terminal streaming.
 
 - [ ] **`curl`-Friendly Endpoint**
@@ -36,7 +38,7 @@ This document outlines the phased development plan for transforming the `cats` r
 
 ---
 
-## 🚀 Phase 3: The Retro Web App
+## Phase 3: The Retro Web App
 **Goal**: Deploy a modern web application (e.g., Next.js, Astro, or Go WASM) with a retro CRT aesthetic.
 
 - [ ] **Web UI Setup**
@@ -52,7 +54,7 @@ This document outlines the phased development plan for transforming the `cats` r
 
 ---
 
-## 🔮 Phase 4: Extra Fun Mechanics (Stretch Goals)
+## Phase 4: Extra Fun Mechanics (Stretch Goals)
 **Goal**: Add delightful, highly shareable mechanics to the project.
 
 - [ ] **Cat MOTD (`cats motd`)**
