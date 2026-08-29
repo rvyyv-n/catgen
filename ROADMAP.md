@@ -1,45 +1,58 @@
-# 🐾 ASCII Cat Generator: Project Roadmap
+# 🐾 CATGEN: Project Roadmap
 
-This document outlines the phased development plan for transforming the `cats` repository into an interactive ASCII Cat Generator and Web App.
+This document outlines the phased development plan for transforming the `cats` repository into **CATGEN**, an interactive ASCII Cat Studio and Web App.
 
-## Phase 1: The Core Terminal Engine (CLI & TUI)
-**Goal**: Build a robust Go-based image-to-ASCII converter and an interactive terminal user interface.
+---
 
-- [ ] **Core ASCII Converter**
-  - [ ] Implement image resizing and grayscale mapping in Go.
-  - [ ] Add multiple character density ramps (Standard, Block, Braille).
-  - [ ] Add 24-bit ANSI color support mapping.
-- [ ] **Interactive TUI (using Bubble Tea)**
-  - [ ] Implement an interactive browser (`Space`/`Enter` for the next cat).
-  - [ ] Add keyboard controls for resolution (`+`/`-`), color toggles (`c`), and inversion (`i`).
-  - [ ] Add export functionality (save to `.txt` or copy to clipboard).
-- [ ] **CLI Mode**
-  - [ ] Add CLI flags for headless execution (e.g., `cats --cli --color=true --width=80`).
+## ✅ Phase 1: The Core Terminal Engine (CLI & TUI) — `v1.0.0`
+**Goal**: Build a robust Go-based image-to-ASCII converter and an interactive BANGEN-style terminal user interface.
 
-## Phase 2: Server Integrations (`curl` Mode)
-**Goal**: Make the cats easily accessible via HTTP requests directly in the terminal.
+- [x] **Core ASCII Converter**
+  - [x] Implement image decoding, aspect-ratio correction, and luminance mapping in Go.
+  - [x] Add multiple character density ramps (Blocks, Standard, Braille, Detailed, Binary, Minimal).
+  - [x] Add 24-bit TrueColor ANSI output and 6 color themes (Matrix, Cyberpunk, Amber, Ice Blue, Grayscale).
+  - [x] Implement Auto-Fit dynamic constraint solver to prevent screen overflow.
+  - [x] Live brightness, contrast, and inversion controls.
+- [x] **Interactive TUI Studio (Bubble Tea & Lipgloss)**
+  - [x] Build BANGEN-style 2-pane UI with embedded border titles and thin framing.
+  - [x] Left pane property controls with full-width solid teal selection highlights.
+  - [x] Radio-button effect lists with smooth scrolling viewport.
+  - [x] Live preview right pane updating in real-time.
+  - [x] Action shortcuts: `r` for instant random cat, `e` for clean text export to `cat_ascii.txt`.
+  - [x] Full-width color-coded keybind footer.
+- [x] **CLI Mode**
+  - [x] Add `--cli`, `--width`, `--color`, `--invert`, and `--file` flags for headless terminal generation.
+
+---
+
+## ⏳ Phase 2: Server Integrations (`curl` Mode & API)
+**Goal**: Connect the ASCII engine to the HTTP server for instant terminal streaming.
 
 - [ ] **`curl`-Friendly Endpoint**
-  - [ ] Add User-Agent detection in `main.go`.
-  - [ ] Serve raw ANSI-colored strings when requested via terminal clients (like `curl localhost:8090/ascii`).
+  - [ ] Detect `curl` / terminal User-Agents on `GET /cat` and stream colored ANSI ASCII directly to stdout.
+  - [ ] Add query parameters for terminal streaming (e.g. `curl localhost:8090/cat?theme=matrix&width=60`).
 - [ ] **Extended JSON API**
-  - [ ] Expand the existing `/api/cat` to optionally return pre-generated ASCII string representations alongside URLs.
+  - [ ] Add `ascii` string field to `/api/cat` and `/api/cats` responses.
 
-## Phase 3: The Retro Web App
+---
+
+## 🚀 Phase 3: The Retro Web App
 **Goal**: Deploy a modern web application (e.g., Next.js, Astro, or Go WASM) with a retro CRT aesthetic.
 
 - [ ] **Web UI Setup**
-  - [ ] Initialize frontend framework and setup hosting (Vercel, Cloudflare, etc.).
+  - [ ] Initialize frontend framework and setup hosting (Vercel, Cloudflare Pages, etc.).
   - [ ] Design a retro CRT terminal aesthetic (CSS shaders, green phosphor scanlines).
 - [ ] **Interactive Web Tools**
-  - [ ] Implement client-side/server-side live ASCII conversion.
+  - [ ] Implement client-side live ASCII conversion (via Canvas / Web Worker / WASM).
   - [ ] Add drag-and-drop support for users to convert their own cat images.
-  - [ ] Implement real-time UI sliders for density, contrast, and resolution.
+  - [ ] Real-time UI sliders for density, contrast, brightness, and resolution.
 - [ ] **Export Options**
   - [ ] One-click export to `.txt`, `.svg`, or `.png`.
   - [ ] Copy-to-clipboard button formatted specifically for Discord codeblocks.
 
-## Phase 4: Extra Fun Mechanics (Stretch Goals)
+---
+
+## 🔮 Phase 4: Extra Fun Mechanics (Stretch Goals)
 **Goal**: Add delightful, highly shareable mechanics to the project.
 
 - [ ] **Cat MOTD (`cats motd`)**
