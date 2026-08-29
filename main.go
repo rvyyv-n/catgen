@@ -3,7 +3,11 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
 	"io/fs"
 	"log"
 	"math/rand"
@@ -14,6 +18,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"cats/ascii"
 )
 
 var allowedExts = map[string]bool{
@@ -61,7 +67,6 @@ func (s *CatServer) reloadImages() {
 	})
 
 	s.images = list
-	log.Printf("Loaded %d cat images from '%s'", len(s.images), s.imageDir)
 }
 
 func (s *CatServer) getRandomCat() (string, error) {
@@ -85,6 +90,14 @@ func (s *CatServer) getAllCats() []string {
 }
 
 func main() {
+	// Parse CLI flags
+	cliMode := flag.Bool("cli", false, "Run in CLI mode to generate ASCII directly to terminal")
+	cliWidth := flag.Int("width", 80, "Width of the ASCII output in CLI mode")
+	cliColor := flag.Bool("color", true, "Enable ANSI color in CLI mode")
+	cliInvert := flag.Bool("invert", false, "Invert luminance in CLI mode")
+	cliFile := flag.String("file", "", "Specific image file to render (defaults to random)")
+	flag.Parse()
+
 	imageDir := os.Getenv("IMAGES_DIR")
 	if imageDir == "" {
 		imageDir = "images"
@@ -92,6 +105,13 @@ func main() {
 	// Fallback to current directory if images folder does not exist
 	if _, err := os.Stat(imageDir); os.IsNotExist(err) {
 		imageDir = "."
+	}
+
+	server := NewCatServer(imageDir)
+
+	if *cliMode {
+		runCLI(server, *cliWidth, *cliColor, *cliInvert, *cliFile)
+		return
 	}
 
 	port := os.Getenv("PORT")
@@ -203,4 +223,30 @@ func (d safeImgDir) Open(name string) (http.File, error) {
 		return nil, err
 	}
 	return f, nil
+}
+
+func runCLI(server *CatServer, width int, colorize bool, invert bool, file string) {
+	target := file
+	if target == "" {
+		cat, err := server.getRandomCat()
+		if err != nil {
+			log.Fatal(err)
+		}
+		target = filepath.Join(server.imageDir, cat)
+	}
+	f, err := os.Open(target)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	img, _, err := image.Decode(f)
+	if err != nil {
+		log.Fatal("Error decoding image: ", err)
+	}
+	fmt.Print(ascii.Convert(img, ascii.Options{
+		Width:       width,
+		Colorize:    colorize,
+		Invert:      invert,
+		DensityRamp: ascii.RampStandard,
+	}))
 }
