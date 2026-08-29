@@ -253,10 +253,14 @@ func runCLI(server *CatServer, width int, colorize bool, invert bool, file strin
 	if err != nil {
 		log.Fatal("Error decoding image: ", err)
 	}
+	theme := ascii.ThemeTrueColor
+	if !colorize {
+		theme = ascii.ThemeGrayscale
+	}
 	fmt.Print(ascii.Convert(img, ascii.Options{
 		Width:       width,
-		Colorize:    colorize,
+		Theme:       theme,
 		Invert:      invert,
-		DensityRamp: ascii.RampStandard,
+		DensityRamp: ascii.RampBlocks,
 	}))
 }
