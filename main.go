@@ -134,8 +134,6 @@ func main() {
 		port = ":" + port
 	}
 
-	server := NewCatServer(imageDir)
-
 	mux := http.NewServeMux()
 
 	// Redirect root to random cat image URL
