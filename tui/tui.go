@@ -17,26 +17,13 @@ import (
 
 // --- Color Palette (Matching BANGEN Theme) ---
 var (
-	colorTeal      = lipgloss.Color("86")  // #00d7af (Active Teal)
-	colorDark      = lipgloss.Color("16")  // #000000 (Black text for highlight)
-	colorPink      = lipgloss.Color("205") // #ff5faf (Section headers)
-	colorMuted     = lipgloss.Color("241") // #626262 (Labels & borders)
-	colorBorder    = lipgloss.Color("37")  // #00afaf (Subtle frame border)
-	colorText      = lipgloss.Color("252") // #d0d0d0 (Light text)
-	colorDim       = lipgloss.Color("244") // #808080 (Dim text)
-	colorSuccess   = lipgloss.Color("42")  // #00d787 (Success green)
-
-	// Border Styles
-	frameBorder = lipgloss.Border{
-		Top:         "─",
-		Bottom:      "─",
-		Left:        "│",
-		Right:       "│",
-		TopLeft:     "┌",
-		TopRight:    "┐",
-		BottomLeft:  "└",
-		BottomRight: "┘",
-	}
+	colorTeal     = lipgloss.Color("86")  // #00d7af (Active Teal)
+	colorDark     = lipgloss.Color("16")  // #000000 (Black text for highlight)
+	colorPink     = lipgloss.Color("205") // #ff5faf (Section headers)
+	colorMuted    = lipgloss.Color("241") // #626262 (Labels & muted text)
+	colorBorder   = lipgloss.Color("37")  // #00afaf (Subtle frame border)
+	colorText     = lipgloss.Color("252") // #d0d0d0 (Light text)
+	colorSuccess  = lipgloss.Color("42")  // #00d787 (Success green)
 
 	headerStyle = lipgloss.NewStyle().
 		Foreground(colorTeal).
@@ -88,14 +75,12 @@ var ramps = []RampOption{
 
 var fitModes = []string{"Auto Fit", "Compact", "Wide", "Max"}
 
-// Navigation items in the Left Pane
 type ItemType int
 
 const (
 	ItemProperty ItemType = iota
 	ItemThemeRadio
 	ItemRampRadio
-	ItemAction
 )
 
 type MenuItem struct {
@@ -104,7 +89,7 @@ type MenuItem struct {
 	Section   string
 	Label     string
 	ValueFunc func(m *Model) string
-	Index     int // Index within category
+	Index     int
 }
 
 type Model struct {
@@ -128,7 +113,6 @@ type Model struct {
 	termH      int
 	asciiArt   string
 	statusMsg  string
-	msgTimer   int
 	rng        *rand.Rand
 }
 
@@ -137,7 +121,7 @@ func NewModel(imageDir string, images []string) Model {
 		ImageDir:   imageDir,
 		Images:     images,
 		ImageIdx:   0,
-		FitModeIdx: 0, // Auto Fit default
+		FitModeIdx: 0, // Auto Fit
 		CustomW:    45,
 		ThemeIdx:   0, // TrueColor
 		RampIdx:    0, // Blocks
@@ -165,8 +149,8 @@ func (m *Model) buildMenu() {
 				return "None"
 			}
 			name := filepath.Base(m.Images[m.ImageIdx])
-			if len(name) > 14 {
-				name = name[:11] + "..."
+			if len(name) > 12 {
+				name = name[:9] + "..."
 			}
 			return name
 		},
@@ -195,7 +179,7 @@ func (m *Model) buildMenu() {
 		},
 	})
 
-	// --- Palette (Themes) ---
+	// --- Palette Section ---
 	for i, t := range themes {
 		idx := i
 		items = append(items, MenuItem{
@@ -207,7 +191,7 @@ func (m *Model) buildMenu() {
 		})
 	}
 
-	// --- Character Ramp ---
+	// --- Character Ramp Section ---
 	for i, r := range ramps {
 		idx := i
 		items = append(items, MenuItem{
@@ -219,7 +203,7 @@ func (m *Model) buildMenu() {
 		})
 	}
 
-	// --- Tuning ---
+	// --- Tuning Section ---
 	items = append(items, MenuItem{
 		ID:      "brightness",
 		Type:    ItemProperty,
@@ -293,7 +277,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateAscii()
 
 		case "r":
-			// Random Cat
 			if len(m.Images) > 0 {
 				m.ImageIdx = m.rng.Intn(len(m.Images))
 				m.statusMsg = "✓ Loaded random cat!"
@@ -301,7 +284,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "e":
-			// Export ASCII to file
 			m.exportToFile()
 		}
 
@@ -348,7 +330,7 @@ func (m *Model) handleAdjust(delta int) {
 		if m.CustomW > 120 {
 			m.CustomW = 120
 		}
-		m.FitModeIdx = 1 // Switch to custom width
+		m.FitModeIdx = 1
 
 	case "brightness":
 		m.Brightness += (delta * 5)
@@ -401,7 +383,6 @@ func (m *Model) exportToFile() {
 		return
 	}
 	filename := "cat_ascii.txt"
-	// Strip ANSI color codes for clean text export
 	var clean strings.Builder
 	inEscape := false
 	for _, r := range m.asciiArt {
@@ -424,7 +405,7 @@ func (m *Model) exportToFile() {
 
 func (m *Model) updateAscii() {
 	if len(m.Images) == 0 {
-		m.asciiArt = "No images found in directory."
+		m.asciiArt = "No images found."
 		return
 	}
 
@@ -442,10 +423,9 @@ func (m *Model) updateAscii() {
 		return
 	}
 
-	// Calculate exact bounds for Live Preview Pane
-	leftPaneW := 33
-	availW := m.termW - leftPaneW - 8
-	availH := m.termH - 6 // Top frame, bottom frame, header, footer
+	leftPaneW := 28
+	availW := m.termW - leftPaneW - 5
+	availH := m.termH - 6
 
 	if availW < 10 {
 		availW = 10
@@ -463,7 +443,7 @@ func (m *Model) updateAscii() {
 	case 1: // Compact
 		targetW = 35
 	case 2: // Wide
-		targetW = 60
+		targetW = 55
 	case 3: // Max
 		targetW = availW
 	}
@@ -483,142 +463,202 @@ func (m *Model) updateAscii() {
 	m.asciiArt = ascii.Convert(img, opts)
 }
 
+// buildFramedBox creates a box with a cleanly centered title in the top border
+func buildFramedBox(title string, content string, width int, height int, borderColor lipgloss.Color, titleColor lipgloss.Color) string {
+	if width < 6 {
+		width = 6
+	}
+	if height < 3 {
+		height = 3
+	}
+
+	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
+	headStyle := lipgloss.NewStyle().Foreground(titleColor).Bold(true)
+
+	// Build Centered Top Border
+	titleStr := " " + title + " "
+	titleLen := len(titleStr)
+	innerW := width - 2
+
+	var topBorder string
+	if titleLen >= innerW {
+		topBorder = borderStyle.Render("┌" + strings.Repeat("─", innerW) + "┐")
+	} else {
+		leftDashes := (innerW - titleLen) / 2
+		rightDashes := innerW - titleLen - leftDashes
+		topBorder = borderStyle.Render("┌"+strings.Repeat("─", leftDashes)) +
+			headStyle.Render(titleStr) +
+			borderStyle.Render(strings.Repeat("─", rightDashes)+"┐")
+	}
+
+	// Bottom Border
+	bottomBorder := borderStyle.Render("└" + strings.Repeat("─", innerW) + "┘")
+
+	// Side borders and content rows
+	contentRows := strings.Split(content, "\n")
+	var bodyRows []string
+
+	for i := 0; i < height-2; i++ {
+		rowText := ""
+		if i < len(contentRows) {
+			rowText = contentRows[i]
+		}
+		// Pad or truncate rowText to innerW
+		renderedRow := lipgloss.NewStyle().Width(innerW).Render(rowText)
+		bodyRows = append(bodyRows, borderStyle.Render("│")+renderedRow+borderStyle.Render("│"))
+	}
+
+	return topBorder + "\n" + strings.Join(bodyRows, "\n") + "\n" + bottomBorder
+}
+
 func (m Model) View() string {
 	if m.termW == 0 {
 		return "Initializing CATGEN..."
 	}
 
-	leftPaneW := 33
-	rightPaneW := m.termW - leftPaneW - 4
+	leftPaneW := 28
+	rightPaneW := m.termW - leftPaneW - 2
 	if rightPaneW < 15 {
 		rightPaneW = 15
 	}
-	contentH := m.termH - 5
+	contentH := m.termH - 4
 	if contentH < 8 {
 		contentH = 8
 	}
+	innerLeftW := leftPaneW - 2
+	innerRightW := rightPaneW - 2
+	innerHeight := contentH - 2
 
 	// --- Left Pane (Controls) ---
-	var lines []string
+	type RenderedRow struct {
+		isSection bool
+		text      string
+		menuIdx   int
+	}
+
+	var allRows []RenderedRow
 	var currentSection string
 
-	visibleCount := contentH
-	if m.cursor < m.scrollOff {
-		m.scrollOff = m.cursor
-	}
-	if m.cursor >= m.scrollOff+visibleCount-2 {
-		m.scrollOff = m.cursor - visibleCount + 3
-	}
-	if m.scrollOff < 0 {
-		m.scrollOff = 0
-	}
-
 	for i, item := range m.menuItems {
-		// Section Header
 		if item.Section != currentSection {
+			if currentSection != "" {
+				allRows = append(allRows, RenderedRow{isSection: true, text: ""})
+			}
 			currentSection = item.Section
-			lines = append(lines, sectionStyle.Render(currentSection))
+			allRows = append(allRows, RenderedRow{
+				isSection: true,
+				text:      " " + sectionStyle.Render(currentSection),
+			})
 		}
 
 		isSelected := (m.cursor == i)
-		var rowContent string
+		var prefix string
+		if isSelected {
+			prefix = "► "
+		} else {
+			prefix = "  "
+		}
 
+		var rowBody string
 		switch item.Type {
 		case ItemProperty:
 			val := item.ValueFunc(&m)
-			lbl := fmt.Sprintf("%-12s", item.Label)
-			rowContent = fmt.Sprintf("%s %14s", lbl, val)
+			lbl := fmt.Sprintf("%-10s", item.Label)
+			rowBody = fmt.Sprintf("%s%11s", lbl, val)
 
 		case ItemThemeRadio:
 			radio := "○"
 			if m.ThemeIdx == item.Index {
 				radio = "●"
 			}
-			rowContent = fmt.Sprintf(" %s %s", radio, item.Label)
+			rowBody = fmt.Sprintf("%s %s", radio, item.Label)
 
 		case ItemRampRadio:
 			radio := "○"
 			if m.RampIdx == item.Index {
 				radio = "●"
 			}
-			rowContent = fmt.Sprintf(" %s %s", radio, item.Label)
+			rowBody = fmt.Sprintf("%s %s", radio, item.Label)
 		}
 
+		rowText := prefix + rowBody
+
+		var renderedText string
 		if isSelected {
-			// Solid teal highlight across the row with black text
 			rowStyle := lipgloss.NewStyle().
 				Background(colorTeal).
 				Foreground(colorDark).
 				Bold(true).
-				Width(leftPaneW - 4)
-
-			lines = append(lines, rowStyle.Render("►"+rowContent[1:]))
+				Width(innerLeftW)
+			renderedText = rowStyle.Render(rowText)
 		} else {
 			rowStyle := lipgloss.NewStyle().
 				Foreground(colorText).
-				Width(leftPaneW - 4)
+				Width(innerLeftW)
+			renderedText = rowStyle.Render(rowText)
+		}
 
-			lines = append(lines, rowStyle.Render(" "+rowContent))
+		allRows = append(allRows, RenderedRow{
+			isSection: false,
+			text:      renderedText,
+			menuIdx:   i,
+		})
+	}
+
+	// Find cursor row in allRows
+	cursorRow := 0
+	for r, row := range allRows {
+		if !row.isSection && row.menuIdx == m.cursor {
+			cursorRow = r
+			break
 		}
 	}
 
-	// Slice visible menu lines for scroll window
-	var visibleMenu []string
+	// Smooth scrolling for left pane
+	if cursorRow < m.scrollOff {
+		m.scrollOff = cursorRow
+	}
+	if cursorRow >= m.scrollOff+innerHeight {
+		m.scrollOff = cursorRow - innerHeight + 1
+	}
+	if m.scrollOff < 0 {
+		m.scrollOff = 0
+	}
+
 	startIdx := m.scrollOff
-	if startIdx > len(lines) {
-		startIdx = len(lines)
+	if startIdx > len(allRows) {
+		startIdx = len(allRows)
 	}
-	endIdx := startIdx + contentH
-	if endIdx > len(lines) {
-		endIdx = len(lines)
+	endIdx := startIdx + innerHeight
+	if endIdx > len(allRows) {
+		endIdx = len(allRows)
 	}
-	visibleMenu = lines[startIdx:endIdx]
 
-	controlsBody := strings.Join(visibleMenu, "\n")
-
-	// Render Left Frame with Title in Border
-	leftBox := lipgloss.NewStyle().
-		Border(frameBorder).
-		BorderForeground(colorBorder).
-		Width(leftPaneW).
-		Height(contentH).
-		Render(controlsBody)
-
-	// Embed "─── Controls ───" header onto top border
-	leftBoxLines := strings.Split(leftBox, "\n")
-	if len(leftBoxLines) > 0 {
-		topBar := leftBoxLines[0]
-		header := "─ Controls "
-		if len(topBar) > len(header)+3 {
-			leftBoxLines[0] = topBar[:3] + headerStyle.Render(header) + topBar[3+len(header):]
-		}
-		leftBox = strings.Join(leftBoxLines, "\n")
+	var visibleTextLines []string
+	for _, row := range allRows[startIdx:endIdx] {
+		visibleTextLines = append(visibleTextLines, row.text)
 	}
+	leftBody := strings.Join(visibleTextLines, "\n")
+
+	leftBox := buildFramedBox("Controls", leftBody, leftPaneW, contentH, colorBorder, colorTeal)
 
 	// --- Right Pane (Live Preview) ---
-	rightBox := lipgloss.NewStyle().
-		Border(frameBorder).
-		BorderForeground(colorBorder).
-		Width(rightPaneW).
-		Height(contentH).
-		Render(m.asciiArt)
+	// Horizontally and vertically center the ASCII Cat
+	centeredArt := lipgloss.Place(
+		innerRightW,
+		innerHeight,
+		lipgloss.Center,
+		lipgloss.Center,
+		m.asciiArt,
+	)
 
-	// Embed "─── Live Preview ───" header onto top border
-	rightBoxLines := strings.Split(rightBox, "\n")
-	if len(rightBoxLines) > 0 {
-		topBar := rightBoxLines[0]
-		header := "─ Live Preview ─ CATGEN "
-		if len(topBar) > len(header)+3 {
-			rightBoxLines[0] = topBar[:3] + headerStyle.Render(header) + topBar[3+len(header):]
-		}
-		rightBox = strings.Join(rightBoxLines, "\n")
-	}
+	rightBox := buildFramedBox("Live Preview", centeredArt, rightPaneW, contentH, colorBorder, colorTeal)
 
-	// Join Panes Horizontally
+	// Seamlessly join frames horizontally
 	mainLayout := lipgloss.JoinHorizontal(lipgloss.Top, leftBox, " ", rightBox)
 
-	// --- Footer (BANGEN Style) ---
-	footerLeft := lipgloss.JoinHorizontal(lipgloss.Top,
+	// --- Footer (Right Aligned across total width) ---
+	footerItems := lipgloss.JoinHorizontal(lipgloss.Top,
 		footerKeyStyle.Render("↑↓"), footerDescStyle.Render(" navigate  "),
 		footerKeyStyle.Render("↔"), footerDescStyle.Render(" adjust  "),
 		footerKeyStyle.Render("Enter"), footerDescStyle.Render(" edit/toggle  "),
@@ -627,12 +667,15 @@ func (m Model) View() string {
 		footerKeyStyle.Render("q"), footerDescStyle.Render(" quit"),
 	)
 
-	status := ""
 	if m.statusMsg != "" {
-		status = msgStyle.Render(m.statusMsg)
+		footerItems = lipgloss.JoinHorizontal(lipgloss.Top, msgStyle.Render(m.statusMsg), "   ", footerItems)
 	}
 
-	footer := lipgloss.JoinHorizontal(lipgloss.Top, footerLeft, "    ", status)
+	totalW := leftPaneW + rightPaneW + 1
+	footer := lipgloss.NewStyle().
+		Width(totalW).
+		Align(lipgloss.Right).
+		Render(footerItems)
 
 	return lipgloss.JoinVertical(lipgloss.Left, mainLayout, footer)
 }
