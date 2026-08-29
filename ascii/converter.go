@@ -197,3 +197,110 @@ func Convert(img image.Image, opts Options) string {
 
 	return builder.String()
 }
+
+// ConvertToDiscord generates a Discord-optimized ASCII snippet (< 1,500 chars, max width 34)
+// wrapped in a ready-to-paste markdown codeblock (with Discord 16-color ANSI support).
+func ConvertToDiscord(img image.Image, colorize bool, ramp string) string {
+	if ramp == "" {
+		ramp = RampStandard
+	}
+	const discordWidth = 34
+	bounds := img.Bounds()
+	origW := bounds.Dx()
+	origH := bounds.Dy()
+	if origW <= 0 || origH <= 0 {
+		return ""
+	}
+
+	const fontAspect = 0.46
+	imgAspect := (float64(origH) / float64(origW)) * fontAspect
+	targetW := discordWidth
+	targetH := int(float64(targetW) * imgAspect)
+	if targetH <= 0 {
+		targetH = 1
+	}
+	if targetH > 22 {
+		targetH = 22
+		targetW = int(float64(targetH) / imgAspect)
+	}
+
+	rampRunes := []rune(ramp)
+	rampLen := len(rampRunes)
+
+	var builder strings.Builder
+	if colorize {
+		builder.WriteString("```ansi\n")
+	} else {
+		builder.WriteString("```\n")
+	}
+
+	// Discord 16 ANSI Palette Reference
+	discordPalette := []struct {
+		r, g, b int
+		ansi    string
+	}{
+		{50, 54, 60, "\x1b[30m"},    // Dark Gray
+		{237, 66, 69, "\x1b[31m"},   // Red
+		{87, 242, 135, "\x1b[32m"},  // Green
+		{254, 231, 92, "\x1b[33m"},  // Yellow
+		{88, 101, 242, "\x1b[34m"},  // Blurple / Blue
+		{235, 69, 158, "\x1b[35m"},  // Pink / Magenta
+		{0, 176, 244, "\x1b[36m"},   // Cyan
+		{255, 255, 255, "\x1b[37m"}, // White
+	}
+
+	closestAnsi := func(r, g, b int) string {
+		bestDist := math.MaxFloat64
+		bestCode := "\x1b[37m"
+		for _, c := range discordPalette {
+			dr := float64(r - c.r)
+			dg := float64(g - c.g)
+			db := float64(b - c.b)
+			dist := dr*dr + dg*dg + db*db
+			if dist < bestDist {
+				bestDist = dist
+				bestCode = c.ansi
+			}
+		}
+		return bestCode
+	}
+
+	lastColor := ""
+	for y := 0; y < targetH; y++ {
+		for x := 0; x < targetW; x++ {
+			srcX := bounds.Min.X + (x * origW / targetW)
+			srcY := bounds.Min.Y + (y * origH / targetH)
+
+			r, g, b, _ := img.At(srcX, srcY).RGBA()
+			r8 := int(r >> 8)
+			g8 := int(g >> 8)
+			b8 := int(b >> 8)
+
+			lum := (0.2126*float64(r8) + 0.7152*float64(g8) + 0.0722*float64(b8)) / 255.0
+			charIdx := int(math.Floor(lum * float64(rampLen)))
+			if charIdx < 0 {
+				charIdx = 0
+			}
+			if charIdx >= rampLen {
+				charIdx = rampLen - 1
+			}
+			char := string(rampRunes[charIdx])
+
+			if colorize {
+				colorCode := closestAnsi(r8, g8, b8)
+				if colorCode != lastColor {
+					builder.WriteString(colorCode)
+					lastColor = colorCode
+				}
+			}
+			builder.WriteString(char)
+		}
+		if colorize {
+			builder.WriteString("\x1b[0m")
+			lastColor = ""
+		}
+		builder.WriteString("\n")
+	}
+	builder.WriteString("```")
+	return builder.String()
+}

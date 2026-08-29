@@ -24,3 +24,8 @@ cats.exe
 *.swo
 .DS_Store
 Thumbs.db
+
+# Exports
+cat_ascii.txt
+cat_discord.txt
+

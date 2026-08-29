@@ -95,6 +95,7 @@ func (s *CatServer) getAllCats() []string {
 func main() {
 	serverMode := flag.Bool("server", false, "Run the HTTP web server")
 	cliMode := flag.Bool("cli", false, "Run in one-shot CLI mode")
+	discordMode := flag.Bool("discord", false, "Output a Discord-optimized markdown codeblock snippet")
 	cliWidth := flag.Int("width", 80, "Width of the ASCII output in CLI mode")
 	cliColor := flag.Bool("color", true, "Enable ANSI color in CLI mode")
 	cliInvert := flag.Bool("invert", false, "Invert luminance in CLI mode")
@@ -110,6 +111,11 @@ func main() {
 	}
 
 	server := NewCatServer(imageDir)
+
+	if *discordMode {
+		runDiscordCLI(server, *cliColor, *cliFile)
+		return
+	}
 
 	if *cliMode {
 		runCLI(server, *cliWidth, *cliColor, *cliInvert, *cliFile)
@@ -263,4 +269,25 @@ func runCLI(server *CatServer, width int, colorize bool, invert bool, file strin
 		Invert:      invert,
 		DensityRamp: ascii.RampBlocks,
 	}))
+}
+
+func runDiscordCLI(server *CatServer, colorize bool, file string) {
+	target := file
+	if target == "" {
+		cat, err := server.getRandomCat()
+		if err != nil {
+			log.Fatal(err)
+		}
+		target = filepath.Join(server.imageDir, cat)
+	}
+	f, err := os.Open(target)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	img, _, err := image.Decode(f)
+	if err != nil {
+		log.Fatal("Error decoding image: ", err)
+	}
+	fmt.Println(ascii.ConvertToDiscord(img, colorize, ascii.RampStandard))
 }

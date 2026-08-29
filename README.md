@@ -26,11 +26,12 @@
 
 * **Interactive TUI Studio**: Full-screen 2-pane terminal interface powered by Bubble Tea and Lipgloss.
 * **Auto-Fit Engine**: Dynamic boundary math scales any image to fit your terminal window perfectly with zero overflow or cutoffs.
+* **Discord-Ready Export**: Formats ASCII into mobile-friendly 34-column codeblocks with Discord 16-color ANSI support.
 * **6 Color Palettes**: TrueColor (24-bit RGB), Grayscale, Matrix Glow, Cyberpunk Neon, Amber Phosphor, and Ice Blue.
 * **6 Character Ramps**: Blocks (`░▒▓█`), Standard (`.:-=+*#%@`), Braille (`⠋⠙⠹`), Detailed ASCII, Binary Matrix (`01`), and Minimal.
 * **Image Tuning**: Live brightness, contrast, inversion, and custom resolution adjustments.
-* **Export**: One-key export of clean ASCII art to `.txt`.
-* **One-Shot CLI**: Print random or specific ASCII cats directly to stdout.
+* **Export**: One-key export to plain text (`.txt`) and Discord markdown snippets.
+* **One-Shot CLI**: Print random, Discord-formatted, or custom ASCII cats directly to stdout.
 * **Web & API Server**: HTTP image & JSON metadata endpoints.
 
 ---
@@ -54,6 +55,7 @@ go run .
 | `Enter` / `Space` | Select / toggle effect |
 | `r` | Load random cat |
 | `e` | Export clean ASCII to `cat_ascii.txt` |
+| `d` | Export Discord codeblock snippet to `cat_discord.txt` |
 | `q` / `Ctrl+C` | Quit |
 
 ---
@@ -65,6 +67,9 @@ Generate ASCII directly to your terminal prompt:
 ```bash
 # Print a random cat in full color
 cats --cli
+
+# Generate a Discord-ready codeblock snippet (< 1,500 chars, max width 34)
+cats --discord
 
 # Specify width, disable color, and invert
 cats --cli --width=60 --color=false --invert

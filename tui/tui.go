@@ -285,6 +285,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "e":
 			m.exportToFile()
+
+		case "d":
+			m.exportToDiscord()
 		}
 
 	case tea.WindowSizeMsg:
@@ -401,6 +404,31 @@ func (m *Model) exportToFile() {
 
 	_ = os.WriteFile(filename, []byte(clean.String()), 0644)
 	m.statusMsg = fmt.Sprintf("✓ Exported to %s!", filename)
+}
+
+func (m *Model) exportToDiscord() {
+	if len(m.Images) == 0 {
+		return
+	}
+	imgPath := filepath.Join(m.ImageDir, filepath.FromSlash(m.Images[m.ImageIdx]))
+	f, err := os.Open(imgPath)
+	if err != nil {
+		m.statusMsg = "Error reading image for Discord export"
+		return
+	}
+	defer f.Close()
+
+	img, _, err := image.Decode(f)
+	if err != nil {
+		m.statusMsg = "Error decoding image for Discord export"
+		return
+	}
+
+	colorize := (m.ThemeIdx != 1) // Colorize unless Grayscale
+	discordSnippet := ascii.ConvertToDiscord(img, colorize, ramps[m.RampIdx].Ramp)
+	filename := "cat_discord.txt"
+	_ = os.WriteFile(filename, []byte(discordSnippet), 0644)
+	m.statusMsg = fmt.Sprintf("✓ Exported Discord snippet to %s!", filename)
 }
 
 func (m *Model) updateAscii() {
@@ -661,9 +689,10 @@ func (m Model) View() string {
 	footerItems := lipgloss.JoinHorizontal(lipgloss.Top,
 		footerKeyStyle.Render("↑↓"), footerDescStyle.Render(" navigate  "),
 		footerKeyStyle.Render("↔"), footerDescStyle.Render(" adjust  "),
-		footerKeyStyle.Render("Enter"), footerDescStyle.Render(" edit/toggle  "),
+		footerKeyStyle.Render("Enter"), footerDescStyle.Render(" toggle  "),
 		footerKeyStyle.Render("r"), footerDescStyle.Render(" random  "),
 		footerKeyStyle.Render("e"), footerDescStyle.Render(" export  "),
+		footerKeyStyle.Render("d"), footerDescStyle.Render(" discord  "),
 		footerKeyStyle.Render("q"), footerDescStyle.Render(" quit"),
 	)
 
