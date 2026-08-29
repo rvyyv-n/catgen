@@ -19,7 +19,10 @@ import (
 	"sync"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"cats/ascii"
+	"cats/tui"
 )
 
 var allowedExts = map[string]bool{
@@ -34,7 +37,7 @@ var allowedExts = map[string]bool{
 type CatServer struct {
 	imageDir string
 	mu       sync.RWMutex
-	images   []string // relative paths from imageDir, slash-separated
+	images   []string
 	rng      *rand.Rand
 }
 
@@ -90,19 +93,18 @@ func (s *CatServer) getAllCats() []string {
 }
 
 func main() {
-	// Parse CLI flags
-	cliMode := flag.Bool("cli", false, "Run in CLI mode to generate ASCII directly to terminal")
+	serverMode := flag.Bool("server", false, "Run the HTTP web server")
+	cliMode := flag.Bool("cli", false, "Run in one-shot CLI mode")
 	cliWidth := flag.Int("width", 80, "Width of the ASCII output in CLI mode")
 	cliColor := flag.Bool("color", true, "Enable ANSI color in CLI mode")
 	cliInvert := flag.Bool("invert", false, "Invert luminance in CLI mode")
-	cliFile := flag.String("file", "", "Specific image file to render (defaults to random)")
+	cliFile := flag.String("file", "", "Specific image file to render in CLI mode")
 	flag.Parse()
 
 	imageDir := os.Getenv("IMAGES_DIR")
 	if imageDir == "" {
 		imageDir = "images"
 	}
-	// Fallback to current directory if images folder does not exist
 	if _, err := os.Stat(imageDir); os.IsNotExist(err) {
 		imageDir = "."
 	}
@@ -111,6 +113,16 @@ func main() {
 
 	if *cliMode {
 		runCLI(server, *cliWidth, *cliColor, *cliInvert, *cliFile)
+		return
+	}
+
+	if !*serverMode {
+		// Default to interactive TUI
+		m := tui.NewModel(server.imageDir, server.getAllCats())
+		p := tea.NewProgram(m, tea.WithAltScreen())
+		if _, err := p.Run(); err != nil {
+			log.Fatal("Error running TUI:", err)
+		}
 		return
 	}
 
