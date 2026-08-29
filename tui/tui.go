@@ -425,7 +425,7 @@ func (m *Model) updateAscii() {
 
 	leftPaneW := 28
 	availW := m.termW - leftPaneW - 5
-	availH := m.termH - 6
+	availH := m.termH - 4
 
 	if availW < 10 {
 		availW = 10
@@ -521,7 +521,7 @@ func (m Model) View() string {
 	if rightPaneW < 15 {
 		rightPaneW = 15
 	}
-	contentH := m.termH - 4
+	contentH := m.termH - 2
 	if contentH < 8 {
 		contentH = 8
 	}
