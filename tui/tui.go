@@ -13,32 +13,53 @@ import (
 	"cats/ascii"
 )
 
+// --- Styles matching the BANGEN reference ---
 var (
+	// Very subtle borders
 	paneStyle = lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("238")).
+		Padding(1, 2)
+
+	// Slightly brighter border for left pane
+	leftPaneStyle = lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("62")).
 		Padding(1, 2)
 
-	activePaneStyle = lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("86")).
-		Padding(1, 2)
-
 	titleStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("205")).
+		Foreground(lipgloss.Color("86")). // Cyan/teal
 		Bold(true).
 		MarginBottom(1)
 
-	itemStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("250"))
+	sectionStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("205")). // Pink section headers
+		MarginBottom(1).
+		MarginTop(1)
 
-	selectedItemStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("86")).
-		Bold(true)
+	labelStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("241")). // Gray
+		Width(10)
+
+	valueStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("252")).
+		Width(18)
+
+	// Highlighted row style (teal background, black text)
+	activeRowStyle = lipgloss.NewStyle().
+		Background(lipgloss.Color("86")).
+		Foreground(lipgloss.Color("16")). // Black text
+		Width(28).                        // Match left pane internal width
+		Padding(0, 1)
+
+	inactiveRowStyle = lipgloss.NewStyle().
+		Width(28).
+		Padding(0, 1)
 
 	footerStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color("241")).
-		MarginTop(1)
+		MarginTop(1).
+		MarginLeft(2)
 )
 
 var ramps = []string{
@@ -49,20 +70,20 @@ var ramps = []string{
 var rampNames = []string{"Standard", "Block", "Braille"}
 
 type Model struct {
-	ImageDir  string
-	Images    []string
-	ImageIdx  int
-	
-	Width     int
-	Colorize  bool
-	Invert    bool
-	RampIdx   int
+	ImageDir string
+	Images   []string
+	ImageIdx int
 
-	cursor    int
-	termW     int
-	termH     int
-	asciiArt  string
-	err       error
+	Width    int
+	Colorize bool
+	Invert   bool
+	RampIdx  int
+
+	cursor   int
+	termW    int
+	termH    int
+	asciiArt string
+	err      error
 }
 
 func NewModel(imageDir string, images []string) Model {
@@ -70,7 +91,7 @@ func NewModel(imageDir string, images []string) Model {
 		ImageDir: imageDir,
 		Images:   images,
 		ImageIdx: 0,
-		Width:    60,
+		Width:    45, // Smaller default for laptops
 		Colorize: true,
 		Invert:   false,
 		RampIdx:  0,
@@ -80,7 +101,7 @@ func NewModel(imageDir string, images []string) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return nil // Triggered externally or on first size msg
+	return nil
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -107,11 +128,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.termW = msg.Width
 		m.termH = msg.Height
+		// Re-clamp width so it doesn't overflow right pane on resize
+		m.clampWidth()
 		if m.asciiArt == "" {
 			m.updateAscii()
 		}
 	}
 	return m, nil
+}
+
+func (m *Model) clampWidth() {
+	maxW := m.termW - 40 // Leave 35+ padding for left pane
+	if m.Width > maxW && maxW > 10 {
+		m.Width = maxW
+	}
 }
 
 func (m *Model) adjustValue(delta int) {
@@ -131,10 +161,7 @@ func (m *Model) adjustValue(delta int) {
 		if m.Width < 10 {
 			m.Width = 10
 		}
-		maxW := m.termW - 45 // Leave room for left pane
-		if m.Width > maxW && maxW > 10 {
-			m.Width = maxW
-		}
+		m.clampWidth()
 	case 2: // Colorize
 		m.Colorize = !m.Colorize
 	case 3: // Ramp
@@ -154,7 +181,7 @@ func (m *Model) updateAscii() {
 		m.asciiArt = "No images found."
 		return
 	}
-	
+
 	imgPath := filepath.Join(m.ImageDir, filepath.FromSlash(m.Images[m.ImageIdx]))
 	f, err := os.Open(imgPath)
 	if err != nil {
@@ -189,48 +216,69 @@ func (m Model) View() string {
 
 	// --- Left Pane (Controls) ---
 	var controls strings.Builder
-	controls.WriteString(titleStyle.Render("CATS AS A SERVICE") + "\n\n")
+	controls.WriteString(titleStyle.Render("CATS AS A SERVICE") + "\n")
+	controls.WriteString(sectionStyle.Render("Controls") + "\n")
 
-	renderItem := func(idx int, label string, val string) {
-		cursor := "  "
-		style := itemStyle
-		if m.cursor == idx {
-			cursor = "▶ "
-			style = selectedItemStyle
+	// Helper to render a perfectly aligned row
+	renderRow := func(idx int, label string, val string) {
+		// Truncate long values cleanly
+		if len(val) > 15 {
+			val = val[:12] + "..."
 		}
-		controls.WriteString(style.Render(fmt.Sprintf("%s%-10s %s\n", cursor, label, val)))
+
+		content := lipgloss.JoinHorizontal(lipgloss.Top,
+			labelStyle.Render(label),
+			valueStyle.Render(val),
+		)
+
+		if m.cursor == idx {
+			// Apply BANGEN style highlight (solid background)
+			controls.WriteString(activeRowStyle.Render(content) + "\n")
+		} else {
+			controls.WriteString(inactiveRowStyle.Render(content) + "\n")
+		}
 	}
 
 	imgName := "None"
 	if len(m.Images) > 0 {
 		imgName = filepath.Base(m.Images[m.ImageIdx])
-		if len(imgName) > 15 {
-			imgName = imgName[:12] + "..."
-		}
 	}
 
-	renderItem(0, "Image:", imgName)
-	renderItem(1, "Width:", fmt.Sprintf("%d", m.Width))
-	renderItem(2, "Color:", fmt.Sprintf("%v", m.Colorize))
-	renderItem(3, "Style:", rampNames[m.RampIdx])
-	renderItem(4, "Invert:", fmt.Sprintf("%v", m.Invert))
+	renderRow(0, "Image", imgName)
+	renderRow(1, "Width", fmt.Sprintf("%d", m.Width))
+	
+	controls.WriteString(sectionStyle.Render("Effects") + "\n")
+	renderRow(2, "Color", fmt.Sprintf("%v", m.Colorize))
+	renderRow(3, "Style", rampNames[m.RampIdx])
+	renderRow(4, "Invert", fmt.Sprintf("%v", m.Invert))
 
-	leftPane := activePaneStyle.
-		Width(35).
-		Height(m.termH - 6).
+	leftPane := leftPaneStyle.
+		Width(34).
+		Height(m.termH - 4). // Adjusting height perfectly to terminal size
 		Render(controls.String())
 
 	// --- Right Pane (Preview) ---
+	rightPaneWidth := m.termW - 40 // 34 for left pane + padding + margins
+	if rightPaneWidth < 10 {
+		rightPaneWidth = 10
+	}
+
+	// Calculate right pane height based on terminal height
+	paneHeight := m.termH - 4
+	if paneHeight < 5 {
+		paneHeight = 5
+	}
+
 	rightPane := paneStyle.
-		Width(m.termW - 42).
-		Height(m.termH - 6).
+		Width(rightPaneWidth).
+		Height(paneHeight).
 		Render(m.asciiArt)
 
 	// Join panes
 	layout := lipgloss.JoinHorizontal(lipgloss.Top, leftPane, "  ", rightPane)
 
-	// Footer
-	footer := footerStyle.Render("↑/↓: Navigate • ←/→: Adjust • q: Quit")
+	// Footer (BANGEN style keybinds)
+	footer := footerStyle.Render("↑↓ navigate  ↔ adjust  Enter toggle  q quit")
 
 	return lipgloss.JoinVertical(lipgloss.Left, layout, footer)
 }
