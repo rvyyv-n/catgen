@@ -3,7 +3,6 @@ package ascii
 import (
 	"fmt"
 	"image"
-	"image/color"
 	_ "image/jpeg"
 	_ "image/png"
 	"strings"
