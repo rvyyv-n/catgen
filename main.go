@@ -6,8 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"image"
-	_ "image/jpeg"
-	_ "image/png"
 	"io/fs"
 	"log"
 	"math/rand"
@@ -22,8 +20,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"cats/internal/ascii"
+	"cats/internal/imgsrc"
 	"cats/internal/tui"
 )
+
+// version is stamped at build time via -ldflags "-X main.version=...".
+var version = "dev"
 
 var allowedExts = map[string]bool{
 	".png":  true,
@@ -99,10 +101,20 @@ func main() {
 	cliWidth := flag.Int("width", 80, "Width of the ASCII output in CLI mode")
 	cliColor := flag.Bool("color", true, "Enable ANSI color in CLI mode")
 	cliInvert := flag.Bool("invert", false, "Invert luminance in CLI mode")
-	cliFile := flag.String("file", "", "Specific image file to render in CLI mode")
+	cliFile := flag.String("file", "", "Image to render: a local path, ~ path, or http(s) URL")
+	cliDir := flag.String("dir", "", "Image directory to browse (overrides IMAGES_DIR)")
+	showVersion := flag.Bool("version", false, "Print the version and exit")
 	flag.Parse()
 
-	imageDir := os.Getenv("IMAGES_DIR")
+	if *showVersion {
+		fmt.Printf("catgen %s\n", version)
+		return
+	}
+
+	imageDir := *cliDir
+	if imageDir == "" {
+		imageDir = os.Getenv("IMAGES_DIR")
+	}
 	if imageDir == "" {
 		imageDir = "images"
 	}
@@ -241,23 +253,25 @@ func (d safeImgDir) Open(name string) (http.File, error) {
 	return f, nil
 }
 
-func runCLI(server *CatServer, width int, colorize bool, invert bool, file string) {
-	target := file
-	if target == "" {
+// resolveImage loads the requested image reference, or a random cat from the
+// image directory when no reference is given. The reference may be a local path,
+// a ~ path, or an http(s) URL.
+func resolveImage(server *CatServer, ref string) (image.Image, error) {
+	if ref == "" {
 		cat, err := server.getRandomCat()
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
-		target = filepath.Join(server.imageDir, cat)
+		ref = filepath.Join(server.imageDir, filepath.FromSlash(cat))
 	}
-	f, err := os.Open(target)
+	img, _, err := imgsrc.LoadImage(ref)
+	return img, err
+}
+
+func runCLI(server *CatServer, width int, colorize bool, invert bool, file string) {
+	img, err := resolveImage(server, file)
 	if err != nil {
 		log.Fatal(err)
-	}
-	defer f.Close()
-	img, _, err := image.Decode(f)
-	if err != nil {
-		log.Fatal("Error decoding image: ", err)
 	}
 	theme := ascii.ThemeTrueColor
 	if !colorize {
@@ -272,22 +286,9 @@ func runCLI(server *CatServer, width int, colorize bool, invert bool, file strin
 }
 
 func runDiscordCLI(server *CatServer, colorize bool, file string) {
-	target := file
-	if target == "" {
-		cat, err := server.getRandomCat()
-		if err != nil {
-			log.Fatal(err)
-		}
-		target = filepath.Join(server.imageDir, cat)
-	}
-	f, err := os.Open(target)
+	img, err := resolveImage(server, file)
 	if err != nil {
 		log.Fatal(err)
-	}
-	defer f.Close()
-	img, _, err := image.Decode(f)
-	if err != nil {
-		log.Fatal("Error decoding image: ", err)
 	}
 	fmt.Println(ascii.ConvertToDiscord(img, colorize, ascii.RampStandard))
 }
