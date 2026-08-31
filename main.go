@@ -1,3 +1,9 @@
+// Regenerate the Windows executable icon from favicon.ico after changing it:
+//
+//	go install github.com/akavel/rsrc@latest
+//	go generate ./...
+//
+//go:generate rsrc -ico favicon.ico -arch amd64 -o rsrc_windows_amd64.syso
 package main
 
 import (
