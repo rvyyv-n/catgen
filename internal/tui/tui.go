@@ -12,7 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"cats/ascii"
+	"cats/internal/ascii"
 )
 
 // --- Color Palette (Matching BANGEN Theme) ---

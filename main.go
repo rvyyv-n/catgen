@@ -21,8 +21,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"cats/ascii"
-	"cats/tui"
+	"cats/internal/ascii"
+	"cats/internal/tui"
 )
 
 var allowedExts = map[string]bool{
