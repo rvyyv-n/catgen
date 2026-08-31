@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"cats/internal/ascii"
 )
 
 func tempPNG(t *testing.T, w, h int) string {
@@ -44,8 +46,8 @@ func TestOpenImageOverlayLoadsExternalFile(t *testing.T) {
 	// Press "o" to open the overlay.
 	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")})
 	m = next.(Model)
-	if !m.inputMode {
-		t.Fatal("pressing 'o' did not enter input mode")
+	if m.overlay != overlayOpenImage {
+		t.Fatal("pressing 'o' did not open the image overlay")
 	}
 
 	// Load a real external image through the same path Enter uses.
@@ -76,8 +78,8 @@ func TestOpenImageOverlayEscCancels(t *testing.T) {
 	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	m = next.(Model)
 
-	if m.inputMode {
-		t.Error("Esc did not leave input mode")
+	if m.overlay != overlayNone {
+		t.Error("Esc did not leave the overlay")
 	}
 	if len(m.Images) != count {
 		t.Errorf("image list changed after cancel: %d != %d", len(m.Images), count)
@@ -106,5 +108,91 @@ func TestViewRendersInputBarInOverlay(t *testing.T) {
 	m = next.(Model)
 	if !strings.Contains(m.View(), "Open image") {
 		t.Error("overlay View() missing the open-image prompt")
+	}
+}
+
+func TestOpenImageOverlayForwardsTypedText(t *testing.T) {
+	m := sized(NewModel("images", []string{"a.png"}))
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")})
+	m = next.(Model)
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("https://e/c.png"), Paste: true})
+	m = next.(Model)
+	if got := m.input.Value(); got != "https://e/c.png" {
+		t.Fatalf("input value = %q, want the pasted URL", got)
+	}
+}
+
+func TestFitInfoToggle(t *testing.T) {
+	m := sized(NewModel("images", nil))
+	if m.showFitInfo {
+		t.Fatal("fit info should start off")
+	}
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	m = next.(Model)
+	if !m.showFitInfo {
+		t.Fatal("'a' did not enable fit info")
+	}
+}
+
+func TestSavePresetWritesFile(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	m := sized(NewModel("images", []string{"a.png"}))
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	m = next.(Model)
+	if m.overlay != overlaySavePreset {
+		t.Fatalf("overlay = %v, want save-preset", m.overlay)
+	}
+	for _, r := range "mylook" {
+		next, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = next.(Model)
+	}
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = next.(Model)
+
+	if m.overlay != overlayNone {
+		t.Error("overlay not cleared after save")
+	}
+	if _, err := os.Stat(filepath.Join(home, ".catgen", "presets", "mylook.json")); err != nil {
+		t.Fatalf("preset file not written: %v", err)
+	}
+}
+
+func TestApplyPresetMapsThemeAndRamp(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	m := sized(NewModel("images", []string{"a.png"}))
+	m.applyPreset("matrix") // built-in
+
+	if want := ascii.ThemeByName("matrix"); m.ThemeIdx != want {
+		t.Errorf("ThemeIdx = %d, want %d", m.ThemeIdx, want)
+	}
+	if want := ascii.RampByName("binary"); m.RampIdx != want {
+		t.Errorf("RampIdx = %d, want %d", m.RampIdx, want)
+	}
+}
+
+func TestExportModalWritesPlainText(t *testing.T) {
+	m := sized(NewModel("images", nil))
+	out := filepath.Join(t.TempDir(), "out.txt")
+
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+	m = next.(Model)
+	if m.overlay != overlayExport {
+		t.Fatalf("overlay = %v, want export", m.overlay)
+	}
+	m.input.SetValue(out)
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = next.(Model)
+
+	if m.overlay != overlayNone {
+		t.Error("overlay not cleared after export")
+	}
+	if _, err := os.Stat(out); err != nil {
+		t.Fatalf("export not written: %v", err)
 	}
 }

@@ -110,10 +110,26 @@ func main() {
 	cliFile := flag.String("file", "", "Image to render: a local path, ~ path, or http(s) URL")
 	cliDir := flag.String("dir", "", "Image directory to browse (overrides IMAGES_DIR)")
 	showVersion := flag.Bool("version", false, "Print the version and exit")
+	listThemes := flag.Bool("list-themes", false, "List available color themes and exit")
+	listRamps := flag.Bool("list-ramps", false, "List available character ramps and exit")
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Printf("catgen %s\n", version)
+		return
+	}
+
+	if *listThemes {
+		for _, t := range ascii.Themes {
+			fmt.Printf("%-12s %s\n", t.Name, t.Label)
+		}
+		return
+	}
+
+	if *listRamps {
+		for _, r := range ascii.Ramps {
+			fmt.Printf("%-12s %s\n", r.Name, r.Label)
+		}
 		return
 	}
 

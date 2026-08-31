@@ -15,67 +15,48 @@ import (
 
 	"cats/internal/ascii"
 	"cats/internal/imgsrc"
+	"cats/internal/presets"
 )
 
 // --- Color Palette (Matching BANGEN Theme) ---
 var (
-	colorTeal     = lipgloss.Color("86")  // #00d7af (Active Teal)
-	colorDark     = lipgloss.Color("16")  // #000000 (Black text for highlight)
-	colorPink     = lipgloss.Color("205") // #ff5faf (Section headers)
-	colorMuted    = lipgloss.Color("241") // #626262 (Labels & muted text)
-	colorBorder   = lipgloss.Color("37")  // #00afaf (Subtle frame border)
-	colorText     = lipgloss.Color("252") // #d0d0d0 (Light text)
-	colorSuccess  = lipgloss.Color("42")  // #00d787 (Success green)
+	colorTeal    = lipgloss.Color("86")  // #00d7af (Active Teal)
+	colorDark    = lipgloss.Color("16")  // #000000 (Black text for highlight)
+	colorPink    = lipgloss.Color("205") // #ff5faf (Section headers)
+	colorMuted   = lipgloss.Color("241") // #626262 (Labels & muted text)
+	colorBorder  = lipgloss.Color("37")  // #00afaf (Subtle frame border)
+	colorText    = lipgloss.Color("252") // #d0d0d0 (Light text)
+	colorSuccess = lipgloss.Color("42")  // #00d787 (Success green)
 
 	headerStyle = lipgloss.NewStyle().
-		Foreground(colorTeal).
-		Bold(true)
+			Foreground(colorTeal).
+			Bold(true)
 
 	sectionStyle = lipgloss.NewStyle().
-		Foreground(colorPink).
-		Bold(true)
+			Foreground(colorPink).
+			Bold(true)
 
 	footerKeyStyle = lipgloss.NewStyle().
-		Foreground(colorTeal).
-		Bold(true)
+			Foreground(colorTeal).
+			Bold(true)
 
 	footerDescStyle = lipgloss.NewStyle().
-		Foreground(colorMuted)
+			Foreground(colorMuted)
 
 	msgStyle = lipgloss.NewStyle().
-		Foreground(colorSuccess).
-		Bold(true)
+			Foreground(colorSuccess).
+			Bold(true)
 )
 
-type ThemeOption struct {
-	Name  string
-	Theme ascii.Theme
-}
-
-var themes = []ThemeOption{
-	{"TrueColor (RGB)", ascii.ThemeTrueColor},
-	{"Grayscale", ascii.ThemeGrayscale},
-	{"Matrix Glow", ascii.ThemeMatrix},
-	{"Cyberpunk", ascii.ThemeCyberpunk},
-	{"Amber Phosphor", ascii.ThemeAmber},
-	{"Ice Blue", ascii.ThemeIceBlue},
-}
-
-type RampOption struct {
-	Name string
-	Ramp string
-}
-
-var ramps = []RampOption{
-	{"Blocks (░▒▓█)", ascii.RampBlocks},
-	{"Standard (.-=+*)", ascii.RampStandard},
-	{"Braille (⠋⠙⠹)", ascii.RampBraille},
-	{"Detailed ASCII", ascii.RampDetailed},
-	{"Binary Matrix (01)", ascii.RampBinary},
-	{"Minimal ( .oO@)", ascii.RampMinimal},
-}
+// themes and ramps mirror the shared catalogs in the ascii package; the TUI
+// indexes into them by ThemeIdx / RampIdx.
+var themes = ascii.Themes
+var ramps = ascii.Ramps
 
 var fitModes = []string{"Auto Fit", "Compact", "Wide", "Max"}
+
+// leftPaneW is the fixed width of the controls pane, including its border.
+const leftPaneW = 32
 
 type ItemType int
 
@@ -83,6 +64,17 @@ const (
 	ItemProperty ItemType = iota
 	ItemThemeRadio
 	ItemRampRadio
+)
+
+// overlayKind identifies which modal, if any, is intercepting key input.
+type overlayKind int
+
+const (
+	overlayNone overlayKind = iota
+	overlayOpenImage
+	overlaySavePreset
+	overlayExport
+	overlayLoadPreset
 )
 
 type MenuItem struct {
@@ -104,9 +96,9 @@ type imageEntry struct {
 }
 
 type Model struct {
-	ImageDir   string
-	Images     []imageEntry
-	ImageIdx   int
+	ImageDir string
+	Images   []imageEntry
+	ImageIdx int
 
 	FitModeIdx int
 	CustomW    int
@@ -116,19 +108,32 @@ type Model struct {
 	Contrast   float64
 	Invert     bool
 
-	cursor     int
-	scrollOff  int
-	menuItems  []MenuItem
+	cursor    int
+	scrollOff int
+	menuItems []MenuItem
 
-	termW      int
-	termH      int
-	asciiArt   string
-	statusMsg  string
-	rng        *rand.Rand
+	termW     int
+	termH     int
+	asciiArt  string
+	statusMsg string
+	rng       *rand.Rand
 
-	// Open-image overlay
-	inputMode bool
-	input     textinput.Model
+	// Fit-info toggle: when on, the footer shows the resolved output grid size.
+	showFitInfo bool
+
+	// Modal overlays share the single text input below.
+	overlay overlayKind
+	input   textinput.Model
+
+	// Load-preset overlay
+	presetNames  []string
+	presetCursor int
+
+	// Export overlay
+	exportDiscord        bool // false = plain text, true = Discord snippet
+	exportField          int  // 0 = format toggle, 1 = output path
+	exportPending        bool // path exists; the next Enter overwrites
+	userEditedExportPath bool // stop auto-filling the path once the user typed
 
 	// Decoded-image cache so re-renders (and remote URLs) don't reload every keystroke
 	curImg    image.Image
@@ -220,7 +225,7 @@ func (m *Model) buildMenu() {
 			ID:      fmt.Sprintf("theme_%d", i),
 			Type:    ItemThemeRadio,
 			Section: "Palette",
-			Label:   t.Name,
+			Label:   t.Label,
 			Index:   idx,
 		})
 	}
@@ -232,7 +237,7 @@ func (m *Model) buildMenu() {
 			ID:      fmt.Sprintf("ramp_%d", i),
 			Type:    ItemRampRadio,
 			Section: "Character Ramp",
-			Label:   r.Name,
+			Label:   r.Label,
 			Index:   idx,
 		})
 	}
@@ -284,19 +289,39 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if m.inputMode {
-			return m.updateInput(msg)
+		if m.overlay != overlayNone {
+			return m.updateOverlay(msg)
 		}
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 
 		case "o":
-			m.inputMode = true
+			m.overlay = overlayOpenImage
 			m.statusMsg = ""
+			m.input.Placeholder = "local path, ~ path, or https:// URL to an image"
 			m.input.SetValue("")
 			m.input.CursorEnd()
 			return m, m.input.Focus()
+
+		case "s":
+			m.overlay = overlaySavePreset
+			m.statusMsg = ""
+			m.input.Placeholder = "preset name"
+			m.input.SetValue("")
+			m.input.CursorEnd()
+			return m, m.input.Focus()
+
+		case "p":
+			names, _ := presets.List()
+			m.presetNames = names
+			m.presetCursor = 0
+			m.overlay = overlayLoadPreset
+			return m, nil
+
+		case "a":
+			m.showFitInfo = !m.showFitInfo
+			return m, nil
 
 		case "up", "k":
 			if m.cursor > 0 {
@@ -328,7 +353,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "e":
-			m.exportToFile()
+			m.overlay = overlayExport
+			m.exportField = 0
+			m.exportPending = false
+			m.userEditedExportPath = false
+			m.statusMsg = ""
+			m.input.Placeholder = "output path"
+			m.input.SetValue(defaultExportPath(m.exportDiscord))
+			m.input.CursorEnd()
+			return m, nil
 
 		case "d":
 			m.exportToDiscord()
@@ -343,18 +376,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// updateInput drives the open-image overlay: Enter loads the typed reference,
-// Esc dismisses it, everything else feeds the text field.
-func (m Model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+// updateOverlay routes key input to the handler for the active modal.
+func (m Model) updateOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch m.overlay {
+	case overlayOpenImage:
+		return m.updateOpenImage(msg)
+	case overlaySavePreset:
+		return m.updateSavePreset(msg)
+	case overlayLoadPreset:
+		return m.updateLoadPreset(msg)
+	case overlayExport:
+		return m.updateExport(msg)
+	}
+	return m, nil
+}
+
+// updateOpenImage drives the open-image overlay: Enter loads the typed
+// reference, Esc dismisses it, everything else feeds the text field.
+func (m Model) updateOpenImage(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "ctrl+c":
-		m.inputMode = false
+		m.overlay = overlayNone
 		m.input.Blur()
 		return m, nil
 
 	case "enter":
 		ref := m.input.Value()
-		m.inputMode = false
+		m.overlay = overlayNone
 		m.input.Blur()
 		m.loadExternal(ref)
 		return m, nil
@@ -363,6 +411,194 @@ func (m Model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
 	return m, cmd
+}
+
+// updateSavePreset captures a preset name and writes the current look to disk.
+func (m Model) updateSavePreset(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "ctrl+c":
+		m.overlay = overlayNone
+		m.input.Blur()
+		return m, nil
+
+	case "enter":
+		name := m.input.Value()
+		m.overlay = overlayNone
+		m.input.Blur()
+		m.savePreset(name)
+		return m, nil
+	}
+
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
+	return m, cmd
+}
+
+// updateLoadPreset drives the preset picker list.
+func (m Model) updateLoadPreset(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "ctrl+c", "q":
+		m.overlay = overlayNone
+
+	case "up", "k":
+		if m.presetCursor > 0 {
+			m.presetCursor--
+		}
+
+	case "down", "j":
+		if m.presetCursor < len(m.presetNames)-1 {
+			m.presetCursor++
+		}
+
+	case "enter", " ":
+		if m.presetCursor >= 0 && m.presetCursor < len(m.presetNames) {
+			m.applyPreset(m.presetNames[m.presetCursor])
+		}
+		m.overlay = overlayNone
+	}
+	return m, nil
+}
+
+// updateExport drives the export modal: a format toggle and an editable path.
+func (m Model) updateExport(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "ctrl+c":
+		m.overlay = overlayNone
+		m.input.Blur()
+		return m, nil
+
+	case "up", "down", "tab":
+		m.exportField = 1 - m.exportField
+		if m.exportField == 1 {
+			return m, m.input.Focus()
+		}
+		m.input.Blur()
+		return m, nil
+
+	case "left", "right":
+		if m.exportField == 0 {
+			m.exportDiscord = !m.exportDiscord
+			m.exportPending = false
+			if !m.userEditedExportPath {
+				m.input.SetValue(defaultExportPath(m.exportDiscord))
+				m.input.CursorEnd()
+			}
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.input, cmd = m.input.Update(msg)
+		return m, cmd
+
+	case "enter":
+		m.doExport()
+		return m, nil
+	}
+
+	if m.exportField == 1 {
+		var cmd tea.Cmd
+		m.input, cmd = m.input.Update(msg)
+		m.userEditedExportPath = true
+		m.exportPending = false
+		return m, cmd
+	}
+	return m, nil
+}
+
+// defaultExportPath is the suggested filename for each export format.
+func defaultExportPath(discord bool) string {
+	if discord {
+		return "cat_discord.txt"
+	}
+	return "cat_ascii.txt"
+}
+
+// savePreset serializes the current look under the given name.
+func (m *Model) savePreset(name string) {
+	if strings.TrimSpace(name) == "" {
+		m.statusMsg = "Preset name required"
+		return
+	}
+	p := presets.Preset{
+		Name:        name,
+		FitMode:     m.FitModeIdx,
+		CustomWidth: m.CustomW,
+		Theme:       themes[m.ThemeIdx].Name,
+		Ramp:        ramps[m.RampIdx].Name,
+		Brightness:  m.Brightness,
+		Contrast:    m.Contrast,
+		Invert:      m.Invert,
+	}
+	if err := presets.Save(p); err != nil {
+		m.statusMsg = "✗ " + condenseErr(err)
+		return
+	}
+	m.statusMsg = "✓ Saved preset " + p.Name
+}
+
+// applyPreset loads a preset by name and maps it onto the model's controls.
+// Unknown theme/ramp names leave the current selection untouched.
+func (m *Model) applyPreset(name string) {
+	p, err := presets.Load(name)
+	if err != nil {
+		m.statusMsg = "✗ " + condenseErr(err)
+		return
+	}
+	if p.FitMode >= 0 && p.FitMode < len(fitModes) {
+		m.FitModeIdx = p.FitMode
+	}
+	if p.CustomWidth > 0 {
+		m.CustomW = p.CustomWidth
+	}
+	if i := ascii.ThemeByName(p.Theme); i >= 0 {
+		m.ThemeIdx = i
+	}
+	if i := ascii.RampByName(p.Ramp); i >= 0 {
+		m.RampIdx = i
+	}
+	m.Brightness = p.Brightness
+	if p.Contrast > 0 {
+		m.Contrast = p.Contrast
+	}
+	m.Invert = p.Invert
+	m.statusMsg = "✓ Loaded preset " + name
+	m.updateAscii()
+}
+
+// doExport writes the current art to the modal's path, asking once before it
+// overwrites an existing file.
+func (m *Model) doExport() {
+	path := strings.TrimSpace(m.input.Value())
+	if path == "" {
+		m.statusMsg = "Output path required"
+		return
+	}
+	if _, err := os.Stat(path); err == nil && !m.exportPending {
+		m.exportPending = true
+		m.statusMsg = "File exists — press Enter again to overwrite"
+		return
+	}
+
+	var data string
+	if m.exportDiscord {
+		img, err := m.currentImage()
+		if err != nil {
+			m.statusMsg = "✗ " + condenseErr(err)
+			return
+		}
+		colorize := m.ThemeIdx != 1 // colorize unless Grayscale
+		data = ascii.ConvertToDiscord(img, colorize, ramps[m.RampIdx].Chars)
+	} else {
+		data = stripANSI(m.asciiArt)
+	}
+
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		m.statusMsg = "✗ " + condenseErr(err)
+		return
+	}
+	m.overlay = overlayNone
+	m.input.Blur()
+	m.exportPending = false
+	m.statusMsg = "✓ Exported to " + path
 }
 
 // loadExternal resolves a user-supplied path or URL, appends it to the image
@@ -491,14 +727,11 @@ func (m *Model) handleSelect() {
 	}
 }
 
-func (m *Model) exportToFile() {
-	if m.asciiArt == "" {
-		return
-	}
-	filename := "cat_ascii.txt"
+// stripANSI removes SGR escape sequences so exported plain text carries no color codes.
+func stripANSI(s string) string {
 	var clean strings.Builder
 	inEscape := false
-	for _, r := range m.asciiArt {
+	for _, r := range s {
 		if r == '\x1b' {
 			inEscape = true
 			continue
@@ -511,9 +744,7 @@ func (m *Model) exportToFile() {
 		}
 		clean.WriteRune(r)
 	}
-
-	_ = os.WriteFile(filename, []byte(clean.String()), 0644)
-	m.statusMsg = fmt.Sprintf("✓ Exported to %s!", filename)
+	return clean.String()
 }
 
 func (m *Model) exportToDiscord() {
@@ -527,9 +758,9 @@ func (m *Model) exportToDiscord() {
 	}
 
 	colorize := (m.ThemeIdx != 1) // Colorize unless Grayscale
-	discordSnippet := ascii.ConvertToDiscord(img, colorize, ramps[m.RampIdx].Ramp)
+	discordSnippet := ascii.ConvertToDiscord(img, colorize, ramps[m.RampIdx].Chars)
 	filename := "cat_discord.txt"
-	_ = os.WriteFile(filename, []byte(discordSnippet), 0644)
+	_ = os.WriteFile(filename, []byte(discordSnippet), 0o644)
 	m.statusMsg = fmt.Sprintf("✓ Exported Discord snippet to %s!", filename)
 }
 
@@ -553,21 +784,11 @@ func (m *Model) currentImage() (image.Image, error) {
 	return img, nil
 }
 
-func (m *Model) updateAscii() {
-	if len(m.Images) == 0 {
-		m.asciiArt = "No images found."
-		return
-	}
-
-	img, err := m.currentImage()
-	if err != nil {
-		m.asciiArt = fmt.Sprintf("Error loading image:\n%v", err)
-		return
-	}
-
-	leftPaneW := 28
-	availW := m.termW - leftPaneW - 5
-	availH := m.termH - 4
+// renderOpts assembles the ascii.Options for the current controls and terminal
+// size. Shared by updateAscii and the fit-info readout so both agree.
+func (m *Model) renderOpts() ascii.Options {
+	availW := m.termW - leftPaneW - 3
+	availH := m.termH - 5
 
 	if availW < 10 {
 		availW = 10
@@ -590,19 +811,45 @@ func (m *Model) updateAscii() {
 		targetW = availW
 	}
 
-	opts := ascii.Options{
+	return ascii.Options{
 		Width:       targetW,
 		MaxWidth:    availW,
 		MaxHeight:   availH,
 		AutoFit:     autoFit,
 		Theme:       themes[m.ThemeIdx].Theme,
-		DensityRamp: ramps[m.RampIdx].Ramp,
+		DensityRamp: ramps[m.RampIdx].Chars,
 		Brightness:  m.Brightness,
 		Contrast:    m.Contrast,
 		Invert:      m.Invert,
 	}
+}
 
-	m.asciiArt = ascii.Convert(img, opts)
+func (m *Model) updateAscii() {
+	if len(m.Images) == 0 {
+		m.asciiArt = "No images found."
+		return
+	}
+
+	img, err := m.currentImage()
+	if err != nil {
+		m.asciiArt = fmt.Sprintf("Error loading image:\n%v", err)
+		return
+	}
+
+	m.asciiArt = ascii.Convert(img, m.renderOpts())
+}
+
+// radioMarker renders the marker for a radio row: a green check for the active
+// choice, a hollow circle otherwise. On the cursor row the check is left
+// unstyled so it stays legible against the teal selection bar.
+func radioMarker(active, onCursor bool) string {
+	if !active {
+		return "○"
+	}
+	if onCursor {
+		return "✓"
+	}
+	return lipgloss.NewStyle().Foreground(colorSuccess).Render("✓")
 }
 
 // buildFramedBox creates a box with a cleanly centered title in the top border
@@ -623,7 +870,9 @@ func buildFramedBox(title string, content string, width int, height int, borderC
 	innerW := width - 2
 
 	var topBorder string
-	if titleLen >= innerW {
+	if strings.TrimSpace(title) == "" {
+		topBorder = borderStyle.Render("┌" + strings.Repeat("─", innerW) + "┐")
+	} else if titleLen >= innerW {
 		topBorder = borderStyle.Render("┌" + strings.Repeat("─", innerW) + "┐")
 	} else {
 		leftDashes := (innerW - titleLen) / 2
@@ -658,12 +907,11 @@ func (m Model) View() string {
 		return "Initializing CATGEN..."
 	}
 
-	leftPaneW := 28
-	rightPaneW := m.termW - leftPaneW - 2
+	rightPaneW := m.termW - leftPaneW
 	if rightPaneW < 15 {
 		rightPaneW = 15
 	}
-	contentH := m.termH - 2
+	contentH := m.termH - 3
 	if contentH < 8 {
 		contentH = 8
 	}
@@ -728,18 +976,10 @@ func (m Model) View() string {
 			rowBody = fmt.Sprintf("%s%11s", lbl, val)
 
 		case ItemThemeRadio:
-			radio := "○"
-			if m.ThemeIdx == item.Index {
-				radio = "●"
-			}
-			rowBody = fmt.Sprintf("%s %s", radio, item.Label)
+			rowBody = fmt.Sprintf("%s %s", radioMarker(m.ThemeIdx == item.Index, isSelected), item.Label)
 
 		case ItemRampRadio:
-			radio := "○"
-			if m.RampIdx == item.Index {
-				radio = "●"
-			}
-			rowBody = fmt.Sprintf("%s %s", radio, item.Label)
+			rowBody = fmt.Sprintf("%s %s", radioMarker(m.RampIdx == item.Index, isSelected), item.Label)
 		}
 
 		rowText := prefix + rowBody
@@ -801,7 +1041,7 @@ func (m Model) View() string {
 	}
 	leftBody := strings.Join(visibleTextLines, "\n")
 
-	leftBox := buildFramedBox("CATGEN", leftBody, leftPaneW, contentH, colorBorder, colorTeal)
+	leftBox := buildFramedBox("", leftBody, leftPaneW, contentH, colorBorder, colorTeal)
 
 	// --- Right Pane (Live Preview) ---
 	// Horizontally and vertically center the ASCII Cat
@@ -815,33 +1055,56 @@ func (m Model) View() string {
 
 	rightBox := buildFramedBox("Live Preview", centeredArt, rightPaneW, contentH, colorBorder, colorTeal)
 
-	// Seamlessly join frames horizontally
-	mainLayout := lipgloss.JoinHorizontal(lipgloss.Top, leftBox, " ", rightBox)
+	// Join the frames flush so the shared edge reads as one divider.
+	mainLayout := lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
 
-	totalW := leftPaneW + rightPaneW + 1
+	totalW := leftPaneW + rightPaneW
 
-	// --- Footer: open-image prompt while the overlay is active, keybinds otherwise ---
+	// Full-area modals replace the two-pane body.
+	switch m.overlay {
+	case overlayExport:
+		mainLayout = centeredModal("Export", m.exportModalBody(), totalW, contentH)
+	case overlayLoadPreset:
+		mainLayout = centeredModal("Load Preset", m.presetModalBody(), totalW, contentH)
+	}
+
+	// --- Footer: context hint for the active overlay, keybinds otherwise ---
 	var footer string
-	if m.inputMode {
-		label := sectionStyle.Render("Open image ")
-		hint := footerDescStyle.Render("   Enter load · Esc cancel")
-		footer = lipgloss.NewStyle().
-			Width(totalW).
-			Render(label + m.input.View() + hint)
-	} else {
+	switch m.overlay {
+	case overlayOpenImage:
+		footer = m.inputFooter("Open image", "Enter load · Esc cancel · Ctrl+V paste", totalW)
+	case overlaySavePreset:
+		footer = m.inputFooter("Save preset", "Enter save · Esc cancel", totalW)
+	case overlayExport:
+		footer = hintFooter("↑↓ field · ←→ format · Enter write · Esc cancel", m.statusMsg, totalW)
+	case overlayLoadPreset:
+		footer = hintFooter("↑↓ move · Enter load · Esc cancel", m.statusMsg, totalW)
+	default:
 		footerItems := lipgloss.JoinHorizontal(lipgloss.Top,
-			footerKeyStyle.Render("↑↓"), footerDescStyle.Render(" navigate  "),
+			footerKeyStyle.Render("↑↓"), footerDescStyle.Render(" nav  "),
 			footerKeyStyle.Render("↔"), footerDescStyle.Render(" adjust  "),
-			footerKeyStyle.Render("Enter"), footerDescStyle.Render(" toggle  "),
+			footerKeyStyle.Render("⏎"), footerDescStyle.Render(" toggle  "),
 			footerKeyStyle.Render("o"), footerDescStyle.Render(" open  "),
 			footerKeyStyle.Render("r"), footerDescStyle.Render(" random  "),
 			footerKeyStyle.Render("e"), footerDescStyle.Render(" export  "),
 			footerKeyStyle.Render("d"), footerDescStyle.Render(" discord  "),
+			footerKeyStyle.Render("s"), footerDescStyle.Render(" save  "),
+			footerKeyStyle.Render("p"), footerDescStyle.Render(" presets  "),
+			footerKeyStyle.Render("a"), footerDescStyle.Render(" info  "),
 			footerKeyStyle.Render("q"), footerDescStyle.Render(" quit"),
 		)
 
+		var lead string
 		if m.statusMsg != "" {
-			footerItems = lipgloss.JoinHorizontal(lipgloss.Top, msgStyle.Render(m.statusMsg), "   ", footerItems)
+			lead = msgStyle.Render(m.statusMsg)
+		} else if m.showFitInfo && m.curImg != nil {
+			gw, gh := ascii.Measure(m.curImg, m.renderOpts())
+			b := m.curImg.Bounds()
+			lead = footerDescStyle.Render(fmt.Sprintf("fit:%s · src %dx%d · grid %dx%d",
+				fitModes[m.FitModeIdx], b.Dx(), b.Dy(), gw, gh))
+		}
+		if lead != "" {
+			footerItems = lipgloss.JoinHorizontal(lipgloss.Top, lead, "   ", footerItems)
 		}
 
 		footer = lipgloss.NewStyle().
@@ -850,5 +1113,80 @@ func (m Model) View() string {
 			Render(footerItems)
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, mainLayout, footer)
+	return lipgloss.JoinVertical(lipgloss.Left, mainLayout, "", footer)
+}
+
+// inputFooter renders a labelled text-input line for the open-image and
+// save-preset overlays.
+func (m Model) inputFooter(label, hint string, totalW int) string {
+	l := sectionStyle.Render(label + " ")
+	h := footerDescStyle.Render("   " + hint)
+	return lipgloss.NewStyle().Width(totalW).Render(l + m.input.View() + h)
+}
+
+// hintFooter renders a single dim hint line, optionally prefixed with a status
+// message, for the modal overlays.
+func hintFooter(hint, status string, totalW int) string {
+	line := footerDescStyle.Render(hint)
+	if status != "" {
+		line = msgStyle.Render(status) + "   " + line
+	}
+	return lipgloss.NewStyle().Width(totalW).Render(line)
+}
+
+// centeredModal frames body under title and centers it in the given area.
+func centeredModal(title, body string, areaW, areaH int) string {
+	lines := strings.Split(body, "\n")
+	boxW := lipgloss.Width(title) + 6
+	for _, ln := range lines {
+		if w := lipgloss.Width(ln) + 4; w > boxW {
+			boxW = w
+		}
+	}
+	if boxW > areaW-2 {
+		boxW = areaW - 2
+	}
+	if boxW < 14 {
+		boxW = 14
+	}
+	boxH := len(lines) + 4
+	if boxH > areaH {
+		boxH = areaH
+	}
+	framed := buildFramedBox(title, "\n"+body, boxW, boxH, colorBorder, colorTeal)
+	return lipgloss.Place(areaW, areaH, lipgloss.Center, lipgloss.Center, framed)
+}
+
+// exportModalBody renders the export modal's two fields: a format toggle and the
+// editable output path.
+func (m Model) exportModalBody() string {
+	plain, discord := "○ Plain text", "○ Discord snippet"
+	if m.exportDiscord {
+		discord = "◉ Discord snippet"
+	} else {
+		plain = "◉ Plain text"
+	}
+	fmtLabel, pathLabel := "  Format:  ", "  Output:  "
+	if m.exportField == 0 {
+		fmtLabel = "► Format:  "
+	} else {
+		pathLabel = "► Output:  "
+	}
+	return fmtLabel + plain + "    " + discord + "\n" + pathLabel + m.input.View()
+}
+
+// presetModalBody renders the preset picker list.
+func (m Model) presetModalBody() string {
+	if len(m.presetNames) == 0 {
+		return "  (no presets found)"
+	}
+	rows := make([]string, len(m.presetNames))
+	for i, n := range m.presetNames {
+		if i == m.presetCursor {
+			rows[i] = lipgloss.NewStyle().Foreground(colorTeal).Bold(true).Render("► " + n)
+		} else {
+			rows[i] = "  " + n
+		}
+	}
+	return strings.Join(rows, "\n")
 }

@@ -47,7 +47,52 @@ This document outlines the phased development plan for transforming the `cats` r
 
 ---
 
-## Phase 2: Server Integrations (`curl` Mode & API) [UP NEXT]
+## Phase 1.6: TUI Studio Polish [COMPLETED]
+**Goal**: Bring the terminal studio closer to feature parity with BANGEN's editor.
+
+- [x] **Look presets** — JSON presets under `~/.catgen/presets/`, `s` to save the
+  current look, `p` to pick one from a list; ships `matrix`, `cyberpunk`,
+  `amber-crt`, and `noir` built-ins. Theme and ramp are stored by name so presets
+  survive catalog reordering.
+- [x] **Export modal** — `e` opens a modal with a plain-text / Discord-snippet
+  toggle, an editable output path, and an overwrite confirmation, replacing the
+  silent fixed-filename dump. `d` still does an instant Discord export.
+- [x] **Fit-info toggle** — `a` shows the resolved output size
+  (`fit:<mode> · src WxH · grid WxH`) in the footer, surfacing what the Auto-Fit
+  solver actually produced.
+- [x] **Active-choice glyph** — the selected theme/ramp shows a green check
+  instead of a filled bullet, matching BANGEN's radio styling.
+- [x] **Shared catalog & CLI discovery** — theme and ramp catalogs moved into the
+  `ascii` package; `--list-themes` and `--list-ramps` print them and exit.
+- [x] **Clipboard paste** — the `o` open-image overlay accepts pasted paths/URLs.
+
+---
+
+## Phase 1.7: Image Export [UP NEXT]
+**Goal**: Produce a universal, shareable output for color ASCII art that a plain
+`.txt` file cannot carry.
+
+- [ ] **Grid intermediate representation**
+  - [ ] Split the converter: `ConvertGrid(img, opts) [][]Cell` where each `Cell`
+    is `{Ch rune, R, G, B uint8}`. `Convert` becomes "grid → ANSI string"; output
+    is unchanged.
+- [ ] **PNG renderer (`RenderPNG`)**
+  - [ ] Draw each cell's glyph in its colour on a dark background using a bundled
+    monospace font embedded with `//go:embed`.
+  - [ ] Use **DejaVu Sans Mono** (permissive licence) — it covers the block
+    `░▒▓█` and braille `⠿` ramp glyphs; `golang.org/x/image/font/opentype` is
+    already in the dependency tree, so no new module.
+  - [ ] Image size = `cols × cellW` by `rows × cellH`; expose a cell size / scale
+    knob.
+- [ ] **Export modal: two options only**
+  - [ ] Replace the plain-text / Discord toggle with **Plain text (`.txt`)** and
+    **Image (`.png`)**; auto-swap the path extension with the format.
+  - [ ] The standalone `d` Discord quick-export stays as a separate shortcut
+    (pending a call on whether to drop it).
+
+---
+
+## Phase 2: Server Integrations (`curl` Mode & API)
 **Goal**: Connect the ASCII engine to the HTTP server for instant terminal streaming.
 
 - [ ] **`curl`-Friendly Endpoint**

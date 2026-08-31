@@ -31,6 +31,64 @@ const (
 	ThemeIceBlue
 )
 
+// ThemeInfo pairs a short, stable identifier (used by CLI flags and presets)
+// and a human-facing label with a Theme value.
+type ThemeInfo struct {
+	Name  string
+	Label string
+	Theme Theme
+}
+
+// Themes is the ordered theme catalog shared by the TUI and the --list-themes
+// flag. The order matches the historical TUI ordering so stored selection
+// indices stay valid.
+var Themes = []ThemeInfo{
+	{"truecolor", "TrueColor (RGB)", ThemeTrueColor},
+	{"grayscale", "Grayscale", ThemeGrayscale},
+	{"matrix", "Matrix Glow", ThemeMatrix},
+	{"cyberpunk", "Cyberpunk", ThemeCyberpunk},
+	{"amber", "Amber Phosphor", ThemeAmber},
+	{"iceblue", "Ice Blue", ThemeIceBlue},
+}
+
+// RampInfo pairs a short, stable identifier and a label with a density ramp.
+type RampInfo struct {
+	Name  string
+	Label string
+	Chars string
+}
+
+// Ramps is the ordered character-ramp catalog shared by the TUI and the
+// --list-ramps flag.
+var Ramps = []RampInfo{
+	{"blocks", "Blocks (░▒▓█)", RampBlocks},
+	{"standard", "Standard (.-=+*)", RampStandard},
+	{"braille", "Braille (⠋⠙⠹)", RampBraille},
+	{"detailed", "Detailed ASCII", RampDetailed},
+	{"binary", "Binary Matrix (01)", RampBinary},
+	{"minimal", "Minimal ( .oO@)", RampMinimal},
+}
+
+// ThemeByName returns the catalog index of the named theme, or -1 if unknown.
+func ThemeByName(name string) int {
+	for i, t := range Themes {
+		if t.Name == name {
+			return i
+		}
+	}
+	return -1
+}
+
+// RampByName returns the catalog index of the named ramp, or -1 if unknown.
+func RampByName(name string) int {
+	for i, r := range Ramps {
+		if r.Name == name {
+			return i
+		}
+	}
+	return -1
+}
+
 // Options holds configuration for the ASCII generation
 type Options struct {
 	Width       int
@@ -44,22 +102,10 @@ type Options struct {
 	DensityRamp string
 }
 
-// Convert takes an image and converts it to an ASCII string strictly within bounds
-func Convert(img image.Image, opts Options) string {
-	if opts.DensityRamp == "" {
-		opts.DensityRamp = RampBlocks
-	}
-	if opts.Contrast <= 0 {
-		opts.Contrast = 1.0
-	}
-
-	bounds := img.Bounds()
-	origW := bounds.Dx()
-	origH := bounds.Dy()
-	if origW <= 0 || origH <= 0 {
-		return ""
-	}
-
+// resolveDims computes the character-grid width and height for a source of
+// origW x origH pixels under opts, applying font-aspect correction and the
+// Auto-Fit / max-bound constraints.
+func resolveDims(origW, origH int, opts Options) (int, int) {
 	// Font aspect ratio correction (terminal characters are roughly twice as tall as wide)
 	const fontAspect = 0.46
 	imgAspect := (float64(origH) / float64(origW)) * fontAspect
@@ -100,6 +146,37 @@ func Convert(img image.Image, opts Options) string {
 	if targetH <= 0 {
 		targetH = 1
 	}
+	return targetW, targetH
+}
+
+// Measure reports the character-grid dimensions Convert will produce for img
+// under opts, without rendering. The TUI's fit-info toggle uses it to show the
+// resolved output size.
+func Measure(img image.Image, opts Options) (w, h int) {
+	b := img.Bounds()
+	if b.Dx() <= 0 || b.Dy() <= 0 {
+		return 0, 0
+	}
+	return resolveDims(b.Dx(), b.Dy(), opts)
+}
+
+// Convert takes an image and converts it to an ASCII string strictly within bounds
+func Convert(img image.Image, opts Options) string {
+	if opts.DensityRamp == "" {
+		opts.DensityRamp = RampBlocks
+	}
+	if opts.Contrast <= 0 {
+		opts.Contrast = 1.0
+	}
+
+	bounds := img.Bounds()
+	origW := bounds.Dx()
+	origH := bounds.Dy()
+	if origW <= 0 || origH <= 0 {
+		return ""
+	}
+
+	targetW, targetH := resolveDims(origW, origH, opts)
 
 	rampRunes := []rune(opts.DensityRamp)
 	rampLen := len(rampRunes)
@@ -120,7 +197,7 @@ func Convert(img image.Image, opts Options) string {
 			lum := 0.2126*r8 + 0.7152*g8 + 0.0722*b8
 
 			// Apply Brightness & Contrast
-			lum = (lum/255.0 - 0.5) * opts.Contrast + 0.5 + (float64(opts.Brightness) / 100.0)
+			lum = (lum/255.0-0.5)*opts.Contrast + 0.5 + (float64(opts.Brightness) / 100.0)
 			if lum < 0 {
 				lum = 0
 			}
