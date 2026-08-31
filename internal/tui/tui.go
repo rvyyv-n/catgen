@@ -9,10 +9,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
 	"cats/internal/ascii"
+	"cats/internal/imgsrc"
 )
 
 // --- Color Palette (Matching BANGEN Theme) ---
@@ -92,9 +94,18 @@ type MenuItem struct {
 	Index     int
 }
 
+// imageEntry is one selectable image. Bundled cats carry a filesystem Path built
+// from the image directory; images opened via the "o" key carry an absolute path
+// or an http(s) URL and are flagged External.
+type imageEntry struct {
+	Display  string
+	Path     string
+	External bool
+}
+
 type Model struct {
 	ImageDir   string
-	Images     []string
+	Images     []imageEntry
 	ImageIdx   int
 
 	FitModeIdx int
@@ -114,12 +125,34 @@ type Model struct {
 	asciiArt   string
 	statusMsg  string
 	rng        *rand.Rand
+
+	// Open-image overlay
+	inputMode bool
+	input     textinput.Model
+
+	// Decoded-image cache so re-renders (and remote URLs) don't reload every keystroke
+	curImg    image.Image
+	curImgKey string
 }
 
 func NewModel(imageDir string, images []string) Model {
+	entries := make([]imageEntry, 0, len(images))
+	for _, rel := range images {
+		entries = append(entries, imageEntry{
+			Display: filepath.Base(rel),
+			Path:    filepath.Join(imageDir, filepath.FromSlash(rel)),
+		})
+	}
+
+	ti := textinput.New()
+	ti.Placeholder = "local path, ~ path, or https:// URL to an image"
+	ti.Prompt = "▸ "
+	ti.CharLimit = 1024
+	ti.Width = 48
+
 	m := Model{
 		ImageDir:   imageDir,
-		Images:     images,
+		Images:     entries,
 		ImageIdx:   0,
 		FitModeIdx: 0, // Auto Fit
 		CustomW:    45,
@@ -130,6 +163,7 @@ func NewModel(imageDir string, images []string) Model {
 		Invert:     false,
 		cursor:     0,
 		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
+		input:      ti,
 	}
 	m.buildMenu()
 	return m
@@ -148,7 +182,7 @@ func (m *Model) buildMenu() {
 			if len(m.Images) == 0 {
 				return "None"
 			}
-			name := filepath.Base(m.Images[m.ImageIdx])
+			name := m.Images[m.ImageIdx].Display
 			if len(name) > 12 {
 				name = name[:9] + "..."
 			}
@@ -250,9 +284,19 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if m.inputMode {
+			return m.updateInput(msg)
+		}
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
+
+		case "o":
+			m.inputMode = true
+			m.statusMsg = ""
+			m.input.SetValue("")
+			m.input.CursorEnd()
+			return m, m.input.Focus()
 
 		case "up", "k":
 			if m.cursor > 0 {
@@ -297,6 +341,72 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// updateInput drives the open-image overlay: Enter loads the typed reference,
+// Esc dismisses it, everything else feeds the text field.
+func (m Model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "ctrl+c":
+		m.inputMode = false
+		m.input.Blur()
+		return m, nil
+
+	case "enter":
+		ref := m.input.Value()
+		m.inputMode = false
+		m.input.Blur()
+		m.loadExternal(ref)
+		return m, nil
+	}
+
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
+	return m, cmd
+}
+
+// loadExternal resolves a user-supplied path or URL, appends it to the image
+// list, and selects it. Failures surface in the status line without disturbing
+// the current selection.
+func (m *Model) loadExternal(ref string) {
+	clean := imgsrc.Ref(ref)
+	if clean == "" {
+		m.statusMsg = "No image path entered"
+		return
+	}
+
+	img, _, err := imgsrc.LoadImage(clean)
+	if err != nil {
+		m.statusMsg = "✗ " + condenseErr(err)
+		return
+	}
+
+	name := filepath.Base(clean)
+	if imgsrc.IsURL(clean) {
+		if i := strings.IndexAny(name, "?#"); i >= 0 {
+			name = name[:i]
+		}
+	}
+	if name == "" || name == "." || name == "/" {
+		name = "image"
+	}
+
+	m.Images = append(m.Images, imageEntry{Display: name, Path: clean, External: true})
+	m.ImageIdx = len(m.Images) - 1
+	m.curImg = img
+	m.curImgKey = clean
+	m.statusMsg = "✓ Loaded " + name
+	m.updateAscii()
+}
+
+// condenseErr trims a wrapped error down to its last, most specific clause so it
+// fits on the status line.
+func condenseErr(err error) string {
+	s := err.Error()
+	if i := strings.LastIndex(s, ": "); i >= 0 && i+2 < len(s) {
+		return s[i+2:]
+	}
+	return s
 }
 
 func (m *Model) handleAdjust(delta int) {
@@ -410,17 +520,9 @@ func (m *Model) exportToDiscord() {
 	if len(m.Images) == 0 {
 		return
 	}
-	imgPath := filepath.Join(m.ImageDir, filepath.FromSlash(m.Images[m.ImageIdx]))
-	f, err := os.Open(imgPath)
+	img, err := m.currentImage()
 	if err != nil {
-		m.statusMsg = "Error reading image for Discord export"
-		return
-	}
-	defer f.Close()
-
-	img, _, err := image.Decode(f)
-	if err != nil {
-		m.statusMsg = "Error decoding image for Discord export"
+		m.statusMsg = "✗ " + condenseErr(err)
 		return
 	}
 
@@ -431,23 +533,35 @@ func (m *Model) exportToDiscord() {
 	m.statusMsg = fmt.Sprintf("✓ Exported Discord snippet to %s!", filename)
 }
 
+// currentImage returns the decoded image for the current selection, using the
+// cache when the selection has not changed since the last load. Remote URLs are
+// therefore fetched once, not on every slider adjustment.
+func (m *Model) currentImage() (image.Image, error) {
+	if len(m.Images) == 0 {
+		return nil, fmt.Errorf("no images available")
+	}
+	key := m.Images[m.ImageIdx].Path
+	if m.curImg != nil && m.curImgKey == key {
+		return m.curImg, nil
+	}
+	img, _, err := imgsrc.LoadImage(key)
+	if err != nil {
+		return nil, err
+	}
+	m.curImg = img
+	m.curImgKey = key
+	return img, nil
+}
+
 func (m *Model) updateAscii() {
 	if len(m.Images) == 0 {
 		m.asciiArt = "No images found."
 		return
 	}
 
-	imgPath := filepath.Join(m.ImageDir, filepath.FromSlash(m.Images[m.ImageIdx]))
-	f, err := os.Open(imgPath)
+	img, err := m.currentImage()
 	if err != nil {
-		m.asciiArt = fmt.Sprintf("Error opening image:\n%v", err)
-		return
-	}
-	defer f.Close()
-
-	img, _, err := image.Decode(f)
-	if err != nil {
-		m.asciiArt = fmt.Sprintf("Error decoding image:\n%v", err)
+		m.asciiArt = fmt.Sprintf("Error loading image:\n%v", err)
 		return
 	}
 
@@ -704,26 +818,37 @@ func (m Model) View() string {
 	// Seamlessly join frames horizontally
 	mainLayout := lipgloss.JoinHorizontal(lipgloss.Top, leftBox, " ", rightBox)
 
-	// --- Footer (Right Aligned across total width) ---
-	footerItems := lipgloss.JoinHorizontal(lipgloss.Top,
-		footerKeyStyle.Render("↑↓"), footerDescStyle.Render(" navigate  "),
-		footerKeyStyle.Render("↔"), footerDescStyle.Render(" adjust  "),
-		footerKeyStyle.Render("Enter"), footerDescStyle.Render(" toggle  "),
-		footerKeyStyle.Render("r"), footerDescStyle.Render(" random  "),
-		footerKeyStyle.Render("e"), footerDescStyle.Render(" export  "),
-		footerKeyStyle.Render("d"), footerDescStyle.Render(" discord  "),
-		footerKeyStyle.Render("q"), footerDescStyle.Render(" quit"),
-	)
-
-	if m.statusMsg != "" {
-		footerItems = lipgloss.JoinHorizontal(lipgloss.Top, msgStyle.Render(m.statusMsg), "   ", footerItems)
-	}
-
 	totalW := leftPaneW + rightPaneW + 1
-	footer := lipgloss.NewStyle().
-		Width(totalW).
-		Align(lipgloss.Right).
-		Render(footerItems)
+
+	// --- Footer: open-image prompt while the overlay is active, keybinds otherwise ---
+	var footer string
+	if m.inputMode {
+		label := sectionStyle.Render("Open image ")
+		hint := footerDescStyle.Render("   Enter load · Esc cancel")
+		footer = lipgloss.NewStyle().
+			Width(totalW).
+			Render(label + m.input.View() + hint)
+	} else {
+		footerItems := lipgloss.JoinHorizontal(lipgloss.Top,
+			footerKeyStyle.Render("↑↓"), footerDescStyle.Render(" navigate  "),
+			footerKeyStyle.Render("↔"), footerDescStyle.Render(" adjust  "),
+			footerKeyStyle.Render("Enter"), footerDescStyle.Render(" toggle  "),
+			footerKeyStyle.Render("o"), footerDescStyle.Render(" open  "),
+			footerKeyStyle.Render("r"), footerDescStyle.Render(" random  "),
+			footerKeyStyle.Render("e"), footerDescStyle.Render(" export  "),
+			footerKeyStyle.Render("d"), footerDescStyle.Render(" discord  "),
+			footerKeyStyle.Render("q"), footerDescStyle.Render(" quit"),
+		)
+
+		if m.statusMsg != "" {
+			footerItems = lipgloss.JoinHorizontal(lipgloss.Top, msgStyle.Render(m.statusMsg), "   ", footerItems)
+		}
+
+		footer = lipgloss.NewStyle().
+			Width(totalW).
+			Align(lipgloss.Right).
+			Render(footerItems)
+	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, mainLayout, footer)
 }
