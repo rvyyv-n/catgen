@@ -27,6 +27,26 @@ This document outlines the phased development plan for transforming the `cats` r
 
 ---
 
+## Phase 1.5: Arbitrary Image Input [COMPLETED]
+**Goal**: Convert any image, not only the bundled cat assets, from every entry point.
+
+- [x] **Shared loader (`imgsrc` package)**
+  - [x] `LoadImage` resolves a local path, `~` path, or `http(s)` URL into a decoded image.
+  - [x] Register `gif` and `webp` decoders alongside `png`/`jpeg`; drop the unsupported `svg` claim.
+  - [x] Path cleaning: trim whitespace and surrounding quotes (terminal drag-and-drop), expand `~`.
+  - [x] Remote fetch with a 15s timeout and a 25 MiB size cap.
+  - [x] Downscale sources larger than 4000 px on the long edge before sampling.
+- [x] **TUI integration**
+  - [x] `o` opens an image by path or URL via a Bubbles text-input overlay.
+  - [x] External images join the carousel — cycle, random, and export like bundled cats.
+  - [x] Decoded-image cache so slider tweaks (and remote URLs) do not reload every keystroke.
+  - [x] Load errors surface in the status line without disturbing the current selection.
+- [x] **CLI**
+  - [x] `--file` accepts local paths, `~` paths, and URLs.
+  - [x] `--dir` overrides the image directory (previously only `IMAGES_DIR`).
+
+---
+
 ## Phase 2: Server Integrations (`curl` Mode & API) [UP NEXT]
 **Goal**: Connect the ASCII engine to the HTTP server for instant terminal streaming.
 
