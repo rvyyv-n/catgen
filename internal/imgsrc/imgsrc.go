@@ -1,7 +1,7 @@
 // Package imgsrc resolves an arbitrary image reference — a local file path or an
 // http(s) URL — into a decoded image ready for ASCII conversion. It is the shared
-// loading layer used by the CLI, the TUI, and (later) the server, so every entry
-// point accepts the same set of formats and the same path conveniences.
+// loading layer shared by the CLI and the TUI, so every entry point accepts the
+// same set of formats and the same path conveniences.
 package imgsrc
 
 import (

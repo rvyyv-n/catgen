@@ -1,151 +1,119 @@
 # CATGEN: Project Roadmap
 
-This document outlines the phased development plan for transforming the `cats` repository into **CATGEN**, an interactive ASCII Cat Studio and Web App.
+**CATGEN** is a terminal-only ASCII cat studio: a Go image-to-ASCII engine, an
+interactive Bubble Tea TUI, and a headless CLI. It is deliberately scoped as a
+TUI app in the spirit of BANGEN — there is no web app, no HTTP server, and no
+plan to add other surfaces.
+
+The current tree ships as **v1**. Two more build passes (Phases 1.7 and 1.8)
+close out image export, TUI theming, and structural cleanup, and Phase 2 cuts
+the **v2** release with cross-platform executables.
 
 ---
 
-## Phase 1: The Core Terminal Engine (CLI & TUI) — v1.0.0 [COMPLETED]
-**Goal**: Build a robust Go-based image-to-ASCII converter and an interactive BANGEN-style terminal user interface.
+## Phase 1: Core Terminal Engine (CLI & TUI) — v1.0.0 [COMPLETED]
 
-- [x] **Core ASCII Converter**
-  - [x] Implement image decoding, aspect-ratio correction, and luminance mapping in Go.
-  - [x] Add multiple character density ramps (Blocks, Standard, Braille, Detailed, Binary, Minimal).
-  - [x] Add 24-bit TrueColor ANSI output and 6 color themes (Matrix, Cyberpunk, Amber, Ice Blue, Grayscale).
-  - [x] Implement Auto-Fit dynamic constraint solver to prevent screen overflow.
-  - [x] Live brightness, contrast, and inversion controls.
-  - [x] Discord-optimized 34-column codeblock formatter with 16-color ANSI support.
-- [x] **Interactive TUI Studio (Bubble Tea & Lipgloss)**
-  - [x] Build BANGEN-style 2-pane UI with embedded centered border titles and thin framing.
-  - [x] Add glowing dual-tone block ASCII CATGEN logo banner to sidebar.
-  - [x] Left pane property controls with full-width solid teal selection highlights.
-  - [x] Radio-button effect lists with smooth scrolling viewport.
-  - [x] Live preview right pane with horizontal & vertical image centering.
-  - [x] Action shortcuts: `r` for instant random cat, `e` for plain text export, `d` for Discord export.
-  - [x] Right-aligned color-coded keybind footer.
-- [x] **CLI Mode**
-  - [x] Add `--cli`, `--discord`, `--width`, `--color`, `--invert`, and `--file` flags for headless terminal generation.
-
----
+- [x] **Core ASCII converter** — image decoding, font-aspect correction, and
+  luminance mapping; density ramps (Blocks, Standard, Braille, Detailed, Binary,
+  Minimal); 24-bit TrueColor ANSI plus 6 color themes; Auto-Fit constraint
+  solver; live brightness / contrast / inversion.
+- [x] **Interactive TUI studio (Bubble Tea & Lipgloss)** — BANGEN-style 2-pane
+  UI with embedded centered border titles, glowing CATGEN logo banner, full-width
+  teal selection highlights, radio-button effect lists, live centered preview,
+  color-coded keybind footer.
+- [x] **Discord export** — 34-column codeblock formatter with 16-color ANSI.
+- [x] **CLI mode** — `--cli`, `--discord`, `--width`, `--color`, `--invert`,
+  `--file`.
 
 ## Phase 1.5: Arbitrary Image Input [COMPLETED]
-**Goal**: Convert any image, not only the bundled cat assets, from every entry point.
 
-- [x] **Shared loader (`imgsrc` package)**
-  - [x] `LoadImage` resolves a local path, `~` path, or `http(s)` URL into a decoded image.
-  - [x] Register `gif` and `webp` decoders alongside `png`/`jpeg`; drop the unsupported `svg` claim.
-  - [x] Path cleaning: trim whitespace and surrounding quotes (terminal drag-and-drop), expand `~`.
-  - [x] Remote fetch with a 15s timeout and a 25 MiB size cap.
-  - [x] Downscale sources larger than 4000 px on the long edge before sampling.
-- [x] **TUI integration**
-  - [x] `o` opens an image by path or URL via a Bubbles text-input overlay.
-  - [x] External images join the carousel — cycle, random, and export like bundled cats.
-  - [x] Decoded-image cache so slider tweaks (and remote URLs) do not reload every keystroke.
-  - [x] Load errors surface in the status line without disturbing the current selection.
-- [x] **CLI**
-  - [x] `--file` accepts local paths, `~` paths, and URLs.
-  - [x] `--dir` overrides the image directory (previously only `IMAGES_DIR`).
-
----
+- [x] **`imgsrc` loader** — `LoadImage` resolves a local path, `~` path, or
+  `http(s)` URL; `png` / `jpeg` / `gif` / `webp` decoders; quote/whitespace
+  trimming and `~` expansion; 15s / 25 MiB remote fetch caps; downscale sources
+  over 4000 px on the long edge.
+- [x] **TUI integration** — `o` opens any image by path or URL; external images
+  join the carousel; decoded-image cache; load errors surface in the status line.
+- [x] **CLI** — `--file` accepts paths / `~` paths / URLs; `--dir` overrides the
+  image directory.
 
 ## Phase 1.6: TUI Studio Polish [COMPLETED]
-**Goal**: Bring the terminal studio closer to feature parity with BANGEN's editor.
 
-- [x] **Look presets** — JSON presets under `~/.catgen/presets/`, `s` to save the
-  current look, `p` to pick one from a list; ships `matrix`, `cyberpunk`,
-  `amber-crt`, and `noir` built-ins. Theme and ramp are stored by name so presets
-  survive catalog reordering.
-- [x] **Export modal** — `e` opens a modal with a plain-text / Discord-snippet
-  toggle, an editable output path, and an overwrite confirmation, replacing the
-  silent fixed-filename dump. `d` still does an instant Discord export.
-- [x] **Fit-info toggle** — `a` shows the resolved output size
-  (`fit:<mode> · src WxH · grid WxH`) in the footer, surfacing what the Auto-Fit
-  solver actually produced.
-- [x] **Active-choice glyph** — the selected theme/ramp shows a green check
-  instead of a filled bullet, matching BANGEN's radio styling.
-- [x] **Shared catalog & CLI discovery** — theme and ramp catalogs moved into the
-  `ascii` package; `--list-themes` and `--list-ramps` print them and exit.
-- [x] **Clipboard paste** — the `o` open-image overlay accepts pasted paths/URLs.
+- [x] **Look presets** — JSON presets under `~/.catgen/presets/`, `s` to save,
+  `p` to pick; ships `matrix`, `cyberpunk`, `amber-crt`, `noir`. Theme and ramp
+  stored by name so presets survive catalog reordering.
+- [x] **Export modal** — `e` opens a modal with a format toggle, editable output
+  path, and overwrite confirmation.
+- [x] **Fit-info toggle** — `a` shows the resolved output size in the footer.
+- [x] **Active-choice glyph** — selected theme/ramp shows a green check.
+- [x] **Shared catalog & CLI discovery** — theme and ramp catalogs live in the
+  `ascii` package; `--list-themes` / `--list-ramps` print them and exit.
+- [x] **Clipboard paste** — the `o` overlay accepts pasted paths/URLs.
 
 ---
 
-## Phase 1.7: Image Export & Codebase Cleanup [UP NEXT]
-**Goal**: Produce a universal, shareable image output for colour ASCII art that a
-plain `.txt` file cannot carry, and pay down structural redundancy before the
-server work in Phase 2.
+## Phase 1.7: Image Export [CURRENT]
 
-### Image export
+**Goal**: produce a shareable colour image of the ASCII art that a `.txt` file
+cannot carry.
 
-- [ ] **Grid intermediate representation**
-  - [ ] Split the converter: `ConvertGrid(img, opts) [][]Cell` where each `Cell`
-    is `{Ch rune, R, G, B uint8}`. `Convert` becomes "grid → ANSI string"; its
-    output is unchanged.
-  - [ ] Re-express `ConvertToDiscord` as "grid → 16-colour ANSI" on top of
-    `ConvertGrid`, deleting its parallel sampling loop, luminance math, and
-    palette matcher (~100 lines collapse).
-- [ ] **PNG renderer (`RenderPNG`)**
-  - [ ] Draw each cell's glyph in its colour on a dark background using a bundled
-    monospace font embedded with `//go:embed`.
-  - [ ] Use **DejaVu Sans Mono** (permissive licence) — it covers the block
-    `░▒▓█` and braille `⠿` ramp glyphs; `golang.org/x/image/font/opentype` is
-    already in the dependency tree, so no new module.
-  - [ ] Image size = `cols × cellW` by `rows × cellH`; expose a cell size / scale
-    knob.
-- [ ] **Export modal: two options only**
-  - [ ] Replace the plain-text / Discord toggle with **Plain text (`.txt`)** and
-    **Image (`.png`)**; auto-swap the path extension with the format.
-  - [ ] Decide whether the standalone `d` Discord quick-export stays or is
-    removed (leaning: keep it as a separate shortcut).
+- [ ] **Grid intermediate representation** — `ConvertGrid(img, opts) [][]Cell`
+  where each `Cell` is `{Ch rune, R, G, B uint8}`. `Convert` becomes
+  "grid → ANSI string" with byte-identical output (extend `converter_test.go` to
+  prove it).
+- [ ] **Collapse `ConvertToDiscord`** onto `ConvertGrid` ("grid → 16-colour
+  ANSI"), deleting its parallel sampling loop, luminance math, and palette
+  matcher.
+- [ ] **`RenderPNG(grid, style)`** — draw each cell's glyph in its colour on a
+  dark background. Bundle **DejaVu Sans Mono** via `//go:embed` (covers the
+  `░▒▓█` block and `⠿` braille ramp glyphs); render with
+  `golang.org/x/image/font/opentype` + `font.Drawer` (already in the dependency
+  tree). Image size = `cols × cellW` by `rows × cellH`, with a cell-size / scale
+  knob.
+- [ ] **Export modal → two options** — replace the plain-text / Discord toggle
+  with **Plain text (`.txt`)** and **Image (`.png`)**, auto-swapping the path
+  extension with the format.
 
-### Codebase cleanup
+**Cleanup carried in this pass** (entangled with the converter refactor):
 
-- [ ] **Extract `internal/server/`** — move `CatServer`, its methods, every HTTP
-  handler, and `safeImgDir` out of `main.go`. `main.go` shrinks to a ~70-line
-  mode dispatcher (flags → CLI / TUI / server). Done now so Phase 2 grows the
-  server package, not `main.go`.
-- [ ] **Unify the extension allowlists** — `internal/server` imports
-  `imgsrc.SupportedExts` and adds `.svg` locally (the file server ships SVG bytes
-  without decoding); delete `main.go`'s separate `allowedExts` map.
-- [ ] **Hoist `fontAspect = 0.46`** to a single package-level `const` in `ascii`
-  (currently redeclared in `resolveDims` and `ConvertToDiscord`).
-- [ ] *(optional)* Split `internal/tui/tui.go` (~1200 lines) along its natural
-  seams: `tui_overlays.go` (overlay handlers + modal rendering) and
-  `tui_view.go` (`View` + `buildFramedBox` + helpers).
+- [ ] Hoist `fontAspect = 0.46` to one package-level `const` in `ascii`.
+- [ ] Drop the standalone `d` Discord quick-export shortcut and its footer entry
+  (`--discord` flag stays).
+- [x] Remove `--server` HTTP mode, `CatServer`, all handlers, `safeImgDir`, and
+  the Dockerfile — out of scope for a TUI-only tool. `main.go` is now a ~135-line
+  dispatcher. The former `allowedExts` map is replaced by `imgsrc.SupportedExts`.
 
----
+## Phase 1.8: TUI Color Themes & Codebase Cleanup
 
-## Phase 2: Server Integrations (`curl` Mode & API)
-**Goal**: Connect the ASCII engine to the HTTP server for instant terminal streaming.
+**Goal**: let the studio chrome match the art, and pay down the remaining
+structural redundancy before cutting v2.
 
-- [ ] **`curl`-Friendly Endpoint**
-  - [ ] Detect `curl` / terminal User-Agents on `GET /cat` and stream colored ANSI ASCII directly to stdout.
-  - [ ] Add query parameters for terminal streaming (e.g. `curl localhost:8090/cat?theme=matrix&width=60`).
-- [ ] **Extended JSON API**
-  - [ ] Add `ascii` string field to `/api/cat` and `/api/cats` responses.
+- [ ] **TUI color schemes** — a small set of built-in chrome palettes
+  (border / selection / accent / text), a key to cycle them, persisted to
+  `~/.catgen/config.json` and restored on next launch. Separate from the ASCII
+  art themes; no custom palette editing.
+- [ ] **Split `internal/tui/tui.go`** (~1200 lines) along its natural seams:
+  `tui.go` (model + `Update`), `tui_overlays.go` (overlay handlers + modal
+  rendering), `tui_view.go` (`View` + `buildFramedBox` + helpers).
+- [ ] **General trim** — remove any remaining dead code, redundant helpers, and
+  stale comments surfaced by the theme and split work.
 
 ---
 
-## Phase 3: The Retro Web App
-**Goal**: Deploy a modern web application (e.g., Next.js, Astro, or Go WASM) with a retro CRT aesthetic.
+## Phase 2: v2 Release
 
-- [ ] **Web UI Setup**
-  - [ ] Initialize frontend framework and setup hosting (Vercel, Cloudflare Pages, etc.).
-  - [ ] Design a retro CRT terminal aesthetic (CSS shaders, green phosphor scanlines).
-- [ ] **Interactive Web Tools**
-  - [ ] Implement client-side live ASCII conversion (via Canvas / Web Worker / WASM).
-  - [ ] Add drag-and-drop support for users to convert their own cat images.
-  - [ ] Real-time UI sliders for density, contrast, brightness, and resolution.
-- [ ] **Export Options**
-  - [ ] One-click export to `.txt`, `.svg`, or `.png`.
-  - [ ] Copy-to-clipboard button formatted specifically for Discord codeblocks.
+**Goal**: ship CATGEN v2 as ready-to-run executables.
 
----
+- [ ] **Curate the bundled image set** — review `images/` and drop frames that
+  convert poorly to ASCII (text / logo overlays, busy backgrounds, low-contrast
+  or tiny subjects); keep the built-in carousel to a tight, high-quality default
+  set. Candidate list gets human sign-off before deletion.
+- [ ] Cross-compile Windows / macOS / Linux binaries (`GOOS`/`GOARCH` matrix),
+  `-trimpath -ldflags "-s -w -X main.version=..."`.
+- [ ] Cut a GitHub Release with the binaries attached and notes covering image
+  export and TUI theming.
+- [ ] Final `README.md` pass: screenshots / cast of the studio, install steps per
+  platform.
+- [ ] Tag **v2.0.0**.
 
-## Phase 4: Extra Fun Mechanics (Stretch Goals)
-**Goal**: Add delightful, highly shareable mechanics to the project.
-
-- [ ] **Cat MOTD (`cats motd`)**
-  - [ ] Combine ASCII cats with `fortune`-style daily cat facts or Unix wisdom.
-- [ ] **Animated Cats**
-  - [ ] Support converting and playing animated `.gif` cat files in the terminal.
-- [ ] **Nyan Cat Live Stream**
-  - [ ] Create an infinite scrolling ASCII rainbow cat mode (`cats stream`).
+*This is the end of the roadmap. CATGEN is a finished TUI tool at v2 — no web
+app, no server, no further phases planned.*
