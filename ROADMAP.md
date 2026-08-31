@@ -68,14 +68,20 @@ This document outlines the phased development plan for transforming the `cats` r
 
 ---
 
-## Phase 1.7: Image Export [UP NEXT]
-**Goal**: Produce a universal, shareable output for color ASCII art that a plain
-`.txt` file cannot carry.
+## Phase 1.7: Image Export & Codebase Cleanup [UP NEXT]
+**Goal**: Produce a universal, shareable image output for colour ASCII art that a
+plain `.txt` file cannot carry, and pay down structural redundancy before the
+server work in Phase 2.
+
+### Image export
 
 - [ ] **Grid intermediate representation**
   - [ ] Split the converter: `ConvertGrid(img, opts) [][]Cell` where each `Cell`
-    is `{Ch rune, R, G, B uint8}`. `Convert` becomes "grid → ANSI string"; output
-    is unchanged.
+    is `{Ch rune, R, G, B uint8}`. `Convert` becomes "grid → ANSI string"; its
+    output is unchanged.
+  - [ ] Re-express `ConvertToDiscord` as "grid → 16-colour ANSI" on top of
+    `ConvertGrid`, deleting its parallel sampling loop, luminance math, and
+    palette matcher (~100 lines collapse).
 - [ ] **PNG renderer (`RenderPNG`)**
   - [ ] Draw each cell's glyph in its colour on a dark background using a bundled
     monospace font embedded with `//go:embed`.
@@ -87,8 +93,23 @@ This document outlines the phased development plan for transforming the `cats` r
 - [ ] **Export modal: two options only**
   - [ ] Replace the plain-text / Discord toggle with **Plain text (`.txt`)** and
     **Image (`.png`)**; auto-swap the path extension with the format.
-  - [ ] The standalone `d` Discord quick-export stays as a separate shortcut
-    (pending a call on whether to drop it).
+  - [ ] Decide whether the standalone `d` Discord quick-export stays or is
+    removed (leaning: keep it as a separate shortcut).
+
+### Codebase cleanup
+
+- [ ] **Extract `internal/server/`** — move `CatServer`, its methods, every HTTP
+  handler, and `safeImgDir` out of `main.go`. `main.go` shrinks to a ~70-line
+  mode dispatcher (flags → CLI / TUI / server). Done now so Phase 2 grows the
+  server package, not `main.go`.
+- [ ] **Unify the extension allowlists** — `internal/server` imports
+  `imgsrc.SupportedExts` and adds `.svg` locally (the file server ships SVG bytes
+  without decoding); delete `main.go`'s separate `allowedExts` map.
+- [ ] **Hoist `fontAspect = 0.46`** to a single package-level `const` in `ascii`
+  (currently redeclared in `resolveDims` and `ConvertToDiscord`).
+- [ ] *(optional)* Split `internal/tui/tui.go` (~1200 lines) along its natural
+  seams: `tui_overlays.go` (overlay handlers + modal rendering) and
+  `tui_view.go` (`View` + `buildFramedBox` + helpers).
 
 ---
 
