@@ -934,17 +934,19 @@ func (m Model) View() string {
 	logoGenStyle := lipgloss.NewStyle().Foreground(colorPink).Bold(true)
 	subLogoStyle := lipgloss.NewStyle().Foreground(colorMuted)
 
+	logoLine1 := logoCatStyle.Render("█▀▀ ▄▀█ ▀█▀") + " " + logoGenStyle.Render("█▀▀ █▀▀ █▄ █")
+	logoLine2 := logoCatStyle.Render("█▄▄ █▀█  █ ") + " " + logoGenStyle.Render("█▄█ ██▄ █ ▀█")
 	allRows = append(allRows, RenderedRow{
 		isSection: true,
-		text:      " " + logoCatStyle.Render("█▀▀ ▄▀█ ▀█▀") + " " + logoGenStyle.Render("█▀▀ █▀▀ █▄ █"),
+		text:      lipgloss.PlaceHorizontal(innerLeftW, lipgloss.Center, logoLine1),
 	})
 	allRows = append(allRows, RenderedRow{
 		isSection: true,
-		text:      " " + logoCatStyle.Render("█▄▄ █▀█  █ ") + " " + logoGenStyle.Render("█▄█ ██▄ █ ▀█"),
+		text:      lipgloss.PlaceHorizontal(innerLeftW, lipgloss.Center, logoLine2),
 	})
 	allRows = append(allRows, RenderedRow{
 		isSection: true,
-		text:      subLogoStyle.Render(" ── ASCII Cat Studio ──"),
+		text:      lipgloss.PlaceHorizontal(innerLeftW, lipgloss.Center, subLogoStyle.Render("── ASCII Cat Studio ──")),
 	})
 	allRows = append(allRows, RenderedRow{isSection: true, text: ""})
 
