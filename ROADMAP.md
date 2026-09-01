@@ -127,12 +127,14 @@ structural redundancy before cutting v2.
 - [ ] **Curate the bundled image set** — the user is auditing `images/` by hand,
   dropping frames that convert poorly to ASCII (text / logo overlays, busy
   backgrounds, low-contrast or tiny subjects).
-- [ ] Package each target as a clean folder — `catgen(.exe)` + `images/` +
-  empty `exports/` + `README.md`, no source.
-- [ ] Cross-compile Windows / macOS / Linux binaries (`GOOS`/`GOARCH` matrix),
-  `-trimpath -ldflags "-s -w -X main.version=..."`.
-- [ ] Cut a GitHub Release with the binaries attached and notes covering image
-  export and TUI theming.
+- [x] **`scripts/release.ps1`** — cross-compiles the `windows/amd64`,
+  `darwin/{amd64,arm64}` and `linux/{amd64,arm64}` matrix with
+  `-trimpath -ldflags "-s -w -X main.version=..."` and `CGO_ENABLED=0`, then
+  assembles one clean folder + zip per target under `dist/`: `catgen(.exe)` +
+  `images/` + an empty `exports/` + `README.md`, no source.
+- [ ] Run `scripts/release.ps1 -Version v2.0.0` and cut a GitHub Release with
+  the five zips attached and notes covering image export, chrome themes, and
+  the exports browser.
 - [ ] Final `README.md` pass: screenshots / cast of the studio, install steps per
   platform.
 - [ ] Tag **v2.0.0**.

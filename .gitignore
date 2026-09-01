@@ -31,3 +31,5 @@ cat_ascii.txt
 cat_ascii.png
 cat_discord.txt
 
+# Release artifacts
+/dist/
