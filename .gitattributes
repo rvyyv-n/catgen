@@ -1,0 +1,3 @@
+# Dev-planning doc — kept in the repo, excluded from `git archive` (and thus
+# from the release source zips built by scripts/release.ps1).
+ROADMAP.md export-ignore
