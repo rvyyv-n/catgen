@@ -20,6 +20,8 @@ import (
 
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/webp" // register WebP decoder (decode-only)
+
+	"github.com/rvyyv-n/catgen/internal/samples"
 )
 
 const (
@@ -76,14 +78,22 @@ func LoadImage(ref string) (image.Image, string, error) {
 	}
 
 	var src io.Reader
-	if IsURL(ref) {
+	switch {
+	case strings.HasPrefix(ref, samples.Prefix):
+		f, err := samples.Open(ref)
+		if err != nil {
+			return nil, "", fmt.Errorf("cannot open embedded sample %q: %w", ref, err)
+		}
+		defer f.Close()
+		src = f
+	case IsURL(ref):
 		rc, err := fetch(ref)
 		if err != nil {
 			return nil, "", err
 		}
 		defer rc.Close()
 		src = rc
-	} else {
+	default:
 		f, err := os.Open(ref)
 		if err != nil {
 			return nil, "", fmt.Errorf("cannot open %q: %w", ref, err)

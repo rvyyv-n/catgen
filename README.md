@@ -29,21 +29,23 @@ no web app, no server, just the terminal. It ships with a pool of sample images
 
 ## Install
 
-Download the archive for your platform from the
-[latest release](https://github.com/rvyyv-n/catgen/releases/latest), unzip it,
-and run `catgen` from a terminal:
+Download the single binary for your platform from the
+[latest release](https://github.com/rvyyv-n/catgen/releases/latest) and run it
+from a terminal — no unzip step, no installer:
 
-| Platform | Archive |
+| Platform | Download |
 | :--- | :--- |
-| Windows (x64) | `catgen-<ver>-windows-x64.zip` |
-| Windows (ARM64) | `catgen-<ver>-windows-arm64.zip` |
-| Linux (x64) | `catgen-<ver>-linux-x64.zip` |
-| Linux (ARM64) | `catgen-<ver>-linux-arm64.zip` |
-| macOS (Apple Silicon) | `catgen-<ver>-macos-arm64.zip` |
+| Windows (x64) | `catgen-<ver>-windows-x64.exe` |
+| Linux (x64) | `catgen-<ver>-linux-x64` |
+| macOS (Apple Silicon) | `catgen-<ver>-macos-arm64` |
 
-Each archive contains the `catgen` binary, the bundled `images/`, and an empty
-`exports/` folder for your output. Nothing is installed system-wide; delete the
-folder to uninstall.
+The sample cat images are embedded in the binary, so it's one file with
+nothing to unpack. On Linux/macOS mark it executable first:
+`chmod +x catgen-<ver>-linux-x64`. Nothing is installed system-wide; delete the
+file to uninstall. `exports/` is created next to it the first time you export.
+
+A matching `catgen-<ver>-src-<platform>.zip` source snapshot is attached to
+every release alongside the binaries.
 
 Or build from source (Go 1.25+):
 
@@ -148,7 +150,7 @@ catgen --version
 | :--- | :--- |
 | `~/.catgen/config.json` | Persisted UI theme |
 | `~/.catgen/presets/` | Saved look presets (`s` to save, `p` to load) |
-| `IMAGES_DIR` env var | Overrides the `images/` pool location (also `--dir`) |
+| `IMAGES_DIR` env var | Points at a real folder of your own images instead of the embedded sample pool (also `--dir`) |
 | `./exports/` | Where the TUI writes `.txt` / `.png` exports |
 
 ---
@@ -160,12 +162,13 @@ catgen --version
 go build -trimpath -ldflags "-s -w" -o catgen ./cmd/catgen
 
 # Versioned build
-go build -trimpath -ldflags "-s -w -X main.version=v2.0.0" -o catgen ./cmd/catgen
+go build -trimpath -ldflags "-s -w -X main.version=v1.0.0" -o catgen ./cmd/catgen
 
 # Regenerate the Windows icon after changing cmd/catgen/favicon.ico
 go install github.com/akavel/rsrc@latest
 go generate ./...
 
-# All release archives (Windows x64/ARM64, Linux x64/ARM64, macOS ARM64)
-pwsh scripts/release.ps1 -Version v2.0.0
+# All release assets: one binary + one source zip per platform
+# (Windows x64, Linux x64, macOS ARM64) under dist/
+pwsh scripts/release.ps1 -Version v1.0.0
 ```

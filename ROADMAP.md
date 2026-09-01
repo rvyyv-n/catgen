@@ -5,13 +5,14 @@ interactive Bubble Tea TUI, and a headless CLI. It is deliberately scoped as a
 TUI app in the spirit of BANGEN — there is no web app, no HTTP server, and no
 plan to add other surfaces.
 
-The current tree ships as **v1** plus Phases 1.7–1.9 (image export, chrome
-themes, layout polish, structural cleanup, exports browser). Phase 2 cuts the
-**v2** release with cross-platform executables.
+Phases 1 through 1.9 (core engine, arbitrary image input, studio polish,
+image export, chrome themes, layout polish, structural cleanup, exports
+browser) and Phase 2 (single-binary packaging) all ship together as the first
+tagged release, **v1.0.0**.
 
 ---
 
-## Phase 1: Core Terminal Engine (CLI & TUI) — v1.0.0 [COMPLETED]
+## Phase 1: Core Terminal Engine (CLI & TUI) [COMPLETED]
 
 - [x] **Core ASCII converter** — image decoding, font-aspect correction, and
   luminance mapping; density ramps (Blocks, Standard, Braille, Detailed, Binary,
@@ -127,27 +128,32 @@ structural redundancy before cutting v2.
 
 ---
 
-## Phase 2: v2 Release
+## Phase 2: v1.0.0 Release
 
-**Goal**: ship CATGEN v2 as ready-to-run executables for a general
-image-to-ASCII audience.
+**Goal**: ship CATGEN as a single ready-to-run executable per platform for a
+general image-to-ASCII audience.
 
 - [x] **Curate the bundled image set** — trimmed to 27 large-subject images
   that translate cleanly to ASCII (`images/` is ~5 MB, down from ~17 MB).
 - [x] **Module path** — `module cats` → `github.com/rvyyv-n/catgen` so
   `go install github.com/rvyyv-n/catgen/cmd/catgen@latest` works.
-- [x] **`scripts/release.ps1`** — cross-compiles Windows x64/ARM64, Linux
-  x64/ARM64 and macOS ARM64 with `-trimpath -ldflags "-s -w -X main.version=..."`
-  and `CGO_ENABLED=0`, then assembles one clean folder + zip per target under
-  `dist/`: `catgen(.exe)` + `images/` + an empty `exports/` + `README.md`, no
-  source. macOS archives are labelled `macos` for clarity.
+- [x] **Embed the sample pool** — `images/` moved to
+  `internal/samples/images/` and embedded via `//go:embed` (`internal/samples`);
+  `imgsrc.LoadImage` reads `embedded:`-prefixed refs from it. A downloaded
+  binary has a working image pool with zero accompanying files. `--dir` /
+  `IMAGES_DIR` still override with a real folder and take priority.
+- [x] **`scripts/release.ps1`** — cross-compiles Windows x64, Linux x64, and
+  macOS ARM64 with `-trimpath -ldflags "-s -w -X main.version=..."` and
+  `CGO_ENABLED=0`, emitting one standalone binary per target directly under
+  `dist/` (no folder, no zip) plus one `git archive` source-code zip per
+  platform label, so every binary has a matching source download beside it.
 - [x] **README rewrite** — reframed as a general image-to-ASCII studio (cat
   sample art kept); per-platform install table, controls, config paths.
 - [ ] Add the studio screenshots to `README.md` (hero, a second theme, a PNG
   export sample; CLI shot optional).
-- [ ] Run `scripts/release.ps1 -Version v2.0.0`, cut the GitHub Release with the
-  five zips + notes (image export, PNG render, themes, exports browser), tag
-  **v2.0.0**.
+- [ ] Run `scripts/release.ps1 -Version v1.0.0`, cut the GitHub Release with
+  the three binaries + three source zips and notes (image export, PNG render,
+  themes, exports browser, embedded sample pool), tag **v1.0.0**.
 
-*This is the end of the roadmap. CATGEN is a finished TUI tool at v2 — no web
-app, no server, no further phases planned.*
+*This is the end of the roadmap. CATGEN is a finished TUI tool at v1.0.0 — no
+web app, no server, no further phases planned.*

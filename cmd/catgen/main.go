@@ -21,6 +21,7 @@ import (
 
 	"github.com/rvyyv-n/catgen/internal/ascii"
 	"github.com/rvyyv-n/catgen/internal/imgsrc"
+	"github.com/rvyyv-n/catgen/internal/samples"
 	"github.com/rvyyv-n/catgen/internal/tui"
 )
 
@@ -45,20 +46,29 @@ func scanImages(dir string) []string {
 	return list
 }
 
-// resolveImageDir picks the image directory: the --dir override, then
-// IMAGES_DIR, then ./images, falling back to the working directory.
-func resolveImageDir(override string) string {
-	dir := override
-	if dir == "" {
-		dir = os.Getenv("IMAGES_DIR")
+// resolveImages picks the image pool: the --dir override, then IMAGES_DIR,
+// then a local ./images folder, then the images embedded in the binary
+// (a bare downloaded catgen has no images/ folder alongside it). An explicit
+// override or IMAGES_DIR that doesn't exist falls back to the working
+// directory, same as before.
+func resolveImages(override string) (dir string, images []string) {
+	explicit := override
+	if explicit == "" {
+		explicit = os.Getenv("IMAGES_DIR")
 	}
+
+	dir = explicit
 	if dir == "" {
 		dir = "images"
 	}
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		dir = "."
+		if explicit != "" {
+			dir = "."
+		} else {
+			return "", samples.Names()
+		}
 	}
-	return dir
+	return dir, scanImages(dir)
 }
 
 // resolveImage loads ref, or a random image from images when ref is empty. The
@@ -103,8 +113,7 @@ func main() {
 		return
 	}
 
-	imageDir := resolveImageDir(*cliDir)
-	images := scanImages(imageDir)
+	imageDir, images := resolveImages(*cliDir)
 
 	switch {
 	case *discordMode:
