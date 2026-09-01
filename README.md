@@ -34,7 +34,7 @@ written in Go. No web app, no server — just the terminal.
 - **Any Image Source**: convert any local file (`png`, `jpg`, `gif`, `webp`) or `http(s)` URL, not just the bundled cats.
 - **Image Tuning**: live brightness, contrast, inversion, and custom width scaling.
 - **Look Presets**: save and recall named looks from `~/.catgen/presets/`.
-- **Export**: plain-text (`.txt`) and Discord-ready 34-column markdown codeblocks.
+- **Export**: plain-text (`.txt`) or a colour image (`.png`) of the art from the TUI; Discord-ready 34-column markdown codeblocks from the CLI.
 - **Headless CLI**: print ASCII straight to stdout.
 
 ---
@@ -58,8 +58,7 @@ go run .
 | `r` | Load random cat |
 | `s` / `p` | Save look preset / pick a preset |
 | `a` | Toggle fit-info in the footer |
-| `e` | Export via modal (editable path, overwrite confirm) |
-| `d` | Instant Discord codeblock export |
+| `e` | Export via modal — plain text (`.txt`) or image (`.png`), editable path, overwrite confirm |
 | `q` / `Ctrl+C` | Quit |
 
 ---

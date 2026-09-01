@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"bytes"
 	"fmt"
 	"image"
+	"image/png"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -130,10 +132,9 @@ type Model struct {
 	presetCursor int
 
 	// Export overlay
-	exportDiscord        bool // false = plain text, true = Discord snippet
-	exportField          int  // 0 = format toggle, 1 = output path
-	exportPending        bool // path exists; the next Enter overwrites
-	userEditedExportPath bool // stop auto-filling the path once the user typed
+	exportPNG     bool // false = plain text (.txt), true = image (.png)
+	exportField   int  // 0 = format toggle, 1 = output path
+	exportPending bool // path exists; the next Enter overwrites
 
 	// Decoded-image cache so re-renders (and remote URLs) don't reload every keystroke
 	curImg    image.Image
@@ -356,15 +357,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.overlay = overlayExport
 			m.exportField = 0
 			m.exportPending = false
-			m.userEditedExportPath = false
 			m.statusMsg = ""
 			m.input.Placeholder = "output path"
-			m.input.SetValue(defaultExportPath(m.exportDiscord))
+			m.input.SetValue(defaultExportPath(m.exportPNG))
 			m.input.CursorEnd()
 			return m, nil
-
-		case "d":
-			m.exportToDiscord()
 		}
 
 	case tea.WindowSizeMsg:
@@ -477,12 +474,10 @@ func (m Model) updateExport(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "left", "right":
 		if m.exportField == 0 {
-			m.exportDiscord = !m.exportDiscord
+			m.exportPNG = !m.exportPNG
 			m.exportPending = false
-			if !m.userEditedExportPath {
-				m.input.SetValue(defaultExportPath(m.exportDiscord))
-				m.input.CursorEnd()
-			}
+			m.input.SetValue(swapExportExt(m.input.Value(), m.exportPNG))
+			m.input.CursorEnd()
 			return m, nil
 		}
 		var cmd tea.Cmd
@@ -497,7 +492,6 @@ func (m Model) updateExport(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.exportField == 1 {
 		var cmd tea.Cmd
 		m.input, cmd = m.input.Update(msg)
-		m.userEditedExportPath = true
 		m.exportPending = false
 		return m, cmd
 	}
@@ -505,11 +499,27 @@ func (m Model) updateExport(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // defaultExportPath is the suggested filename for each export format.
-func defaultExportPath(discord bool) string {
-	if discord {
-		return "cat_discord.txt"
+func defaultExportPath(png bool) string {
+	if png {
+		return "cat_ascii.png"
 	}
 	return "cat_ascii.txt"
+}
+
+// swapExportExt keeps the user's chosen stem but swaps the extension to match
+// the selected format. An empty path falls back to the default name.
+func swapExportExt(path string, png bool) string {
+	want := ".txt"
+	if png {
+		want = ".png"
+	}
+	if strings.TrimSpace(path) == "" {
+		return defaultExportPath(png)
+	}
+	if ext := filepath.Ext(path); ext != "" {
+		return strings.TrimSuffix(path, ext) + want
+	}
+	return path + want
 }
 
 // savePreset serializes the current look under the given name.
@@ -578,20 +588,30 @@ func (m *Model) doExport() {
 		return
 	}
 
-	var data string
-	if m.exportDiscord {
+	var data []byte
+	if m.exportPNG {
 		img, err := m.currentImage()
 		if err != nil {
 			m.statusMsg = "✗ " + condenseErr(err)
 			return
 		}
-		colorize := m.ThemeIdx != 1 // colorize unless Grayscale
-		data = ascii.ConvertToDiscord(img, colorize, ramps[m.RampIdx].Chars)
+		grid := ascii.ConvertGrid(img, m.renderOpts())
+		pngImg, err := ascii.RenderPNG(grid, 2)
+		if err != nil {
+			m.statusMsg = "✗ " + condenseErr(err)
+			return
+		}
+		var buf bytes.Buffer
+		if err := png.Encode(&buf, pngImg); err != nil {
+			m.statusMsg = "✗ " + condenseErr(err)
+			return
+		}
+		data = buf.Bytes()
 	} else {
-		data = stripANSI(m.asciiArt)
+		data = []byte(stripANSI(m.asciiArt))
 	}
 
-	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+	if err := os.WriteFile(path, data, 0o644); err != nil {
 		m.statusMsg = "✗ " + condenseErr(err)
 		return
 	}
@@ -745,23 +765,6 @@ func stripANSI(s string) string {
 		clean.WriteRune(r)
 	}
 	return clean.String()
-}
-
-func (m *Model) exportToDiscord() {
-	if len(m.Images) == 0 {
-		return
-	}
-	img, err := m.currentImage()
-	if err != nil {
-		m.statusMsg = "✗ " + condenseErr(err)
-		return
-	}
-
-	colorize := (m.ThemeIdx != 1) // Colorize unless Grayscale
-	discordSnippet := ascii.ConvertToDiscord(img, colorize, ramps[m.RampIdx].Chars)
-	filename := "cat_discord.txt"
-	_ = os.WriteFile(filename, []byte(discordSnippet), 0o644)
-	m.statusMsg = fmt.Sprintf("✓ Exported Discord snippet to %s!", filename)
 }
 
 // currentImage returns the decoded image for the current selection, using the
@@ -1089,7 +1092,6 @@ func (m Model) View() string {
 			footerKeyStyle.Render("o"), footerDescStyle.Render(" open  "),
 			footerKeyStyle.Render("r"), footerDescStyle.Render(" random  "),
 			footerKeyStyle.Render("e"), footerDescStyle.Render(" export  "),
-			footerKeyStyle.Render("d"), footerDescStyle.Render(" discord  "),
 			footerKeyStyle.Render("s"), footerDescStyle.Render(" save  "),
 			footerKeyStyle.Render("p"), footerDescStyle.Render(" presets  "),
 			footerKeyStyle.Render("a"), footerDescStyle.Render(" info  "),
@@ -1162,9 +1164,9 @@ func centeredModal(title, body string, areaW, areaH int) string {
 // exportModalBody renders the export modal's two fields: a format toggle and the
 // editable output path.
 func (m Model) exportModalBody() string {
-	plain, discord := "○ Plain text", "○ Discord snippet"
-	if m.exportDiscord {
-		discord = "◉ Discord snippet"
+	plain, png := "○ Plain text", "○ Image (PNG)"
+	if m.exportPNG {
+		png = "◉ Image (PNG)"
 	} else {
 		plain = "◉ Plain text"
 	}
@@ -1174,7 +1176,7 @@ func (m Model) exportModalBody() string {
 	} else {
 		pathLabel = "► Output:  "
 	}
-	return fmtLabel + plain + "    " + discord + "\n" + pathLabel + m.input.View()
+	return fmtLabel + plain + "    " + png + "\n" + pathLabel + m.input.View()
 }
 
 // presetModalBody renders the preset picker list.

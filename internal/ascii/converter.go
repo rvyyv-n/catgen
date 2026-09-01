@@ -89,6 +89,18 @@ func RampByName(name string) int {
 	return -1
 }
 
+// fontAspect corrects for terminal cells being roughly twice as tall as wide,
+// so square source images map to square-looking character grids.
+const fontAspect = 0.46
+
+// Cell is one character of the ASCII grid: the glyph plus the colour it renders
+// in. The colour is always populated (grayscale stores the luminance grey), so
+// RenderPNG can draw every theme without re-sampling.
+type Cell struct {
+	Ch      rune
+	R, G, B uint8
+}
+
 // Options holds configuration for the ASCII generation
 type Options struct {
 	Width       int
@@ -106,8 +118,6 @@ type Options struct {
 // origW x origH pixels under opts, applying font-aspect correction and the
 // Auto-Fit / max-bound constraints.
 func resolveDims(origW, origH int, opts Options) (int, int) {
-	// Font aspect ratio correction (terminal characters are roughly twice as tall as wide)
-	const fontAspect = 0.46
 	imgAspect := (float64(origH) / float64(origW)) * fontAspect
 
 	targetW := opts.Width
@@ -160,8 +170,16 @@ func Measure(img image.Image, opts Options) (w, h int) {
 	return resolveDims(b.Dx(), b.Dy(), opts)
 }
 
-// Convert takes an image and converts it to an ASCII string strictly within bounds
+// Convert takes an image and converts it to an ANSI ASCII string strictly
+// within bounds. It is the grid produced by ConvertGrid serialised to ANSI.
 func Convert(img image.Image, opts Options) string {
+	return renderANSI(ConvertGrid(img, opts), opts.Theme)
+}
+
+// ConvertGrid samples img into a character grid under opts. Each Cell carries
+// its glyph and the RGB it should render in for the active theme. Returns nil
+// for a zero-area image.
+func ConvertGrid(img image.Image, opts Options) [][]Cell {
 	if opts.DensityRamp == "" {
 		opts.DensityRamp = RampBlocks
 	}
@@ -173,16 +191,17 @@ func Convert(img image.Image, opts Options) string {
 	origW := bounds.Dx()
 	origH := bounds.Dy()
 	if origW <= 0 || origH <= 0 {
-		return ""
+		return nil
 	}
 
 	targetW, targetH := resolveDims(origW, origH, opts)
 
 	rampRunes := []rune(opts.DensityRamp)
 	rampLen := len(rampRunes)
-	var builder strings.Builder
 
+	grid := make([][]Cell, targetH)
 	for y := 0; y < targetH; y++ {
+		row := make([]Cell, targetW)
 		for x := 0; x < targetW; x++ {
 			// Nearest neighbor coordinate mapping
 			srcX := bounds.Min.X + (x * origW / targetW)
@@ -217,62 +236,112 @@ func Convert(img image.Image, opts Options) string {
 			if charIdx >= rampLen {
 				charIdx = rampLen - 1
 			}
-			char := string(rampRunes[charIdx])
 
-			// Apply color themes
-			switch opts.Theme {
-			case ThemeTrueColor:
-				// Boost color with brightness/contrast
-				cr := math.Min(255, math.Max(0, (r8-128)*opts.Contrast+128+float64(opts.Brightness)*2.55))
-				cg := math.Min(255, math.Max(0, (g8-128)*opts.Contrast+128+float64(opts.Brightness)*2.55))
-				cb := math.Min(255, math.Max(0, (b8-128)*opts.Contrast+128+float64(opts.Brightness)*2.55))
-				builder.WriteString(fmt.Sprintf("\x1b[38;2;%d;%d;%dm%s", int(cr), int(cg), int(cb), char))
+			cr, cg, cb := cellColor(opts, r8, g8, b8, lum, x, targetW)
+			row[x] = Cell{Ch: rampRunes[charIdx], R: cr, G: cg, B: cb}
+		}
+		grid[y] = row
+	}
+	return grid
+}
 
-			case ThemeMatrix:
-				// Hacker Green glow based on luminance
-				mg := int(lum * 255)
-				mr := int(lum * 30)
-				mb := int(lum * 50)
-				builder.WriteString(fmt.Sprintf("\x1b[38;2;%d;%d;%dm%s", mr, mg, mb, char))
+// cellColor computes the render colour for one cell under opts.Theme. The math
+// mirrors the historical per-theme branches in Convert exactly.
+func cellColor(opts Options, r8, g8, b8, lum float64, x, targetW int) (uint8, uint8, uint8) {
+	switch opts.Theme {
+	case ThemeTrueColor:
+		// Boost color with brightness/contrast
+		cr := math.Min(255, math.Max(0, (r8-128)*opts.Contrast+128+float64(opts.Brightness)*2.55))
+		cg := math.Min(255, math.Max(0, (g8-128)*opts.Contrast+128+float64(opts.Brightness)*2.55))
+		cb := math.Min(255, math.Max(0, (b8-128)*opts.Contrast+128+float64(opts.Brightness)*2.55))
+		return uint8(cr), uint8(cg), uint8(cb)
 
-			case ThemeCyberpunk:
-				// Gradient between Neon Cyan (#00f0ff) and Neon Magenta (#ff007f)
-				blend := (float64(x)/float64(targetW) + lum) / 2.0
-				cr := int((1.0-blend)*0 + blend*255)
-				cg := int((1.0-blend)*240 + blend*0)
-				cb := int((1.0-blend)*255 + blend*130)
-				builder.WriteString(fmt.Sprintf("\x1b[38;2;%d;%d;%dm%s", cr, cg, cb, char))
+	case ThemeMatrix:
+		// Hacker Green glow based on luminance
+		return uint8(lum * 30), uint8(lum * 255), uint8(lum * 50)
 
-			case ThemeAmber:
-				// Vintage CRT Amber (#ffb000)
-				ar := int(lum * 255)
-				ag := int(lum * 176)
-				ab := int(lum * 20)
-				builder.WriteString(fmt.Sprintf("\x1b[38;2;%d;%d;%dm%s", ar, ag, ab, char))
+	case ThemeCyberpunk:
+		// Gradient between Neon Cyan (#00f0ff) and Neon Magenta (#ff007f)
+		blend := (float64(x)/float64(targetW) + lum) / 2.0
+		cr := int((1.0-blend)*0 + blend*255)
+		cg := int((1.0-blend)*240 + blend*0)
+		cb := int((1.0-blend)*255 + blend*130)
+		return uint8(cr), uint8(cg), uint8(cb)
 
-			case ThemeIceBlue:
-				// Frost Cyan (#00ffff)
-				ir := int(lum * 50)
-				ig := int(lum * 230)
-				ib := int(lum * 255)
-				builder.WriteString(fmt.Sprintf("\x1b[38;2;%d;%d;%dm%s", ir, ig, ib, char))
+	case ThemeAmber:
+		// Vintage CRT Amber (#ffb000)
+		return uint8(lum * 255), uint8(lum * 176), uint8(lum * 20)
 
-			case ThemeGrayscale:
-				fallthrough
+	case ThemeIceBlue:
+		// Frost Cyan (#00ffff)
+		return uint8(lum * 50), uint8(lum * 230), uint8(lum * 255)
+
+	default:
+		// Grayscale / terminal default: store the luminance grey for RenderPNG.
+		g := uint8(lum * 255)
+		return g, g, g
+	}
+}
+
+// renderANSI serialises a grid to the same ANSI byte stream the old Convert
+// produced: TrueColor SGR per cell for the colour themes, bare glyphs for
+// grayscale, a reset at each row end for every theme except grayscale, and no
+// trailing newline.
+func renderANSI(grid [][]Cell, theme Theme) string {
+	if len(grid) == 0 {
+		return ""
+	}
+	var builder strings.Builder
+	for y, row := range grid {
+		for _, c := range row {
+			switch theme {
+			case ThemeTrueColor, ThemeMatrix, ThemeCyberpunk, ThemeAmber, ThemeIceBlue:
+				builder.WriteString(fmt.Sprintf("\x1b[38;2;%d;%d;%dm%s", c.R, c.G, c.B, string(c.Ch)))
 			default:
-				// Monochrome / Terminal Default
-				builder.WriteString(char)
+				builder.WriteString(string(c.Ch))
 			}
 		}
-		if opts.Theme != ThemeGrayscale {
+		if theme != ThemeGrayscale {
 			builder.WriteString("\x1b[0m")
 		}
-		if y < targetH-1 {
+		if y < len(grid)-1 {
 			builder.WriteString("\n")
 		}
 	}
-
 	return builder.String()
+}
+
+// discordPalette is Discord's renderable 16-colour ANSI subset (8 foregrounds).
+var discordPalette = []struct {
+	r, g, b int
+	ansi    string
+}{
+	{50, 54, 60, "\x1b[30m"},    // Dark Gray
+	{237, 66, 69, "\x1b[31m"},   // Red
+	{87, 242, 135, "\x1b[32m"},  // Green
+	{254, 231, 92, "\x1b[33m"},  // Yellow
+	{88, 101, 242, "\x1b[34m"},  // Blurple / Blue
+	{235, 69, 158, "\x1b[35m"},  // Pink / Magenta
+	{0, 176, 244, "\x1b[36m"},   // Cyan
+	{255, 255, 255, "\x1b[37m"}, // White
+}
+
+// closestDiscordANSI returns the nearest discordPalette SGR code to an RGB
+// triple by squared Euclidean distance.
+func closestDiscordANSI(r, g, b int) string {
+	bestDist := math.MaxFloat64
+	bestCode := "\x1b[37m"
+	for _, c := range discordPalette {
+		dr := float64(r - c.r)
+		dg := float64(g - c.g)
+		db := float64(b - c.b)
+		dist := dr*dr + dg*dg + db*db
+		if dist < bestDist {
+			bestDist = dist
+			bestCode = c.ansi
+		}
+	}
+	return bestCode
 }
 
 // ConvertToDiscord generates a Discord-optimized ASCII snippet (< 1,500 chars, max width 34)
@@ -281,28 +350,16 @@ func ConvertToDiscord(img image.Image, colorize bool, ramp string) string {
 	if ramp == "" {
 		ramp = RampStandard
 	}
-	const discordWidth = 34
-	bounds := img.Bounds()
-	origW := bounds.Dx()
-	origH := bounds.Dy()
-	if origW <= 0 || origH <= 0 {
+	grid := ConvertGrid(img, Options{
+		Width:       34,
+		MaxHeight:   22,
+		Theme:       ThemeTrueColor,
+		Contrast:    1.0,
+		DensityRamp: ramp,
+	})
+	if len(grid) == 0 {
 		return ""
 	}
-
-	const fontAspect = 0.46
-	imgAspect := (float64(origH) / float64(origW)) * fontAspect
-	targetW := discordWidth
-	targetH := int(float64(targetW) * imgAspect)
-	if targetH <= 0 {
-		targetH = 1
-	}
-	if targetH > 22 {
-		targetH = 22
-		targetW = int(float64(targetH) / imgAspect)
-	}
-
-	rampRunes := []rune(ramp)
-	rampLen := len(rampRunes)
 
 	var builder strings.Builder
 	if colorize {
@@ -311,66 +368,17 @@ func ConvertToDiscord(img image.Image, colorize bool, ramp string) string {
 		builder.WriteString("```\n")
 	}
 
-	// Discord 16 ANSI Palette Reference
-	discordPalette := []struct {
-		r, g, b int
-		ansi    string
-	}{
-		{50, 54, 60, "\x1b[30m"},    // Dark Gray
-		{237, 66, 69, "\x1b[31m"},   // Red
-		{87, 242, 135, "\x1b[32m"},  // Green
-		{254, 231, 92, "\x1b[33m"},  // Yellow
-		{88, 101, 242, "\x1b[34m"},  // Blurple / Blue
-		{235, 69, 158, "\x1b[35m"},  // Pink / Magenta
-		{0, 176, 244, "\x1b[36m"},   // Cyan
-		{255, 255, 255, "\x1b[37m"}, // White
-	}
-
-	closestAnsi := func(r, g, b int) string {
-		bestDist := math.MaxFloat64
-		bestCode := "\x1b[37m"
-		for _, c := range discordPalette {
-			dr := float64(r - c.r)
-			dg := float64(g - c.g)
-			db := float64(b - c.b)
-			dist := dr*dr + dg*dg + db*db
-			if dist < bestDist {
-				bestDist = dist
-				bestCode = c.ansi
-			}
-		}
-		return bestCode
-	}
-
 	lastColor := ""
-	for y := 0; y < targetH; y++ {
-		for x := 0; x < targetW; x++ {
-			srcX := bounds.Min.X + (x * origW / targetW)
-			srcY := bounds.Min.Y + (y * origH / targetH)
-
-			r, g, b, _ := img.At(srcX, srcY).RGBA()
-			r8 := int(r >> 8)
-			g8 := int(g >> 8)
-			b8 := int(b >> 8)
-
-			lum := (0.2126*float64(r8) + 0.7152*float64(g8) + 0.0722*float64(b8)) / 255.0
-			charIdx := int(math.Floor(lum * float64(rampLen)))
-			if charIdx < 0 {
-				charIdx = 0
-			}
-			if charIdx >= rampLen {
-				charIdx = rampLen - 1
-			}
-			char := string(rampRunes[charIdx])
-
+	for _, row := range grid {
+		for _, c := range row {
 			if colorize {
-				colorCode := closestAnsi(r8, g8, b8)
+				colorCode := closestDiscordANSI(int(c.R), int(c.G), int(c.B))
 				if colorCode != lastColor {
 					builder.WriteString(colorCode)
 					lastColor = colorCode
 				}
 			}
-			builder.WriteString(char)
+			builder.WriteString(string(c.Ch))
 		}
 		if colorize {
 			builder.WriteString("\x1b[0m")

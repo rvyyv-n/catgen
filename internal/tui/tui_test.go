@@ -196,3 +196,59 @@ func TestExportModalWritesPlainText(t *testing.T) {
 		t.Fatalf("export not written: %v", err)
 	}
 }
+
+func TestExportModalWritesPNG(t *testing.T) {
+	m := sized(NewModel("images", nil))
+	m.loadExternal(tempPNG(t, 48, 36))
+	out := filepath.Join(t.TempDir(), "out.png")
+
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+	m = next.(Model)
+
+	// Toggle the format field from plain text to image.
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = next.(Model)
+	if !m.exportPNG {
+		t.Fatal("Right on the format field did not select PNG")
+	}
+
+	m.input.SetValue(out)
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = next.(Model)
+
+	if m.overlay != overlayNone {
+		t.Errorf("overlay not cleared after export: %v", m.overlay)
+	}
+	f, err := os.Open(out)
+	if err != nil {
+		t.Fatalf("png not written: %v", err)
+	}
+	defer f.Close()
+	cfg, err := png.DecodeConfig(f)
+	if err != nil {
+		t.Fatalf("output is not a valid PNG: %v", err)
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 {
+		t.Errorf("degenerate PNG dimensions %dx%d", cfg.Width, cfg.Height)
+	}
+}
+
+func TestSwapExportExt(t *testing.T) {
+	cases := []struct {
+		in   string
+		png  bool
+		want string
+	}{
+		{"cat_ascii.txt", true, "cat_ascii.png"},
+		{"cat_ascii.png", false, "cat_ascii.txt"},
+		{"art/my cat.txt", true, "art/my cat.png"},
+		{"noext", true, "noext.png"},
+		{"", true, "cat_ascii.png"},
+		{"", false, "cat_ascii.txt"},
+	}
+	for _, c := range cases {
+		if got := swapExportExt(c.in, c.png); got != c.want {
+			t.Errorf("swapExportExt(%q, %v) = %q, want %q", c.in, c.png, got, c.want)
+		}
+	}
+}

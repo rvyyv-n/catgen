@@ -5,9 +5,9 @@ interactive Bubble Tea TUI, and a headless CLI. It is deliberately scoped as a
 TUI app in the spirit of BANGEN — there is no web app, no HTTP server, and no
 plan to add other surfaces.
 
-The current tree ships as **v1**. Two more build passes (Phases 1.7 and 1.8)
-close out image export, TUI theming, and structural cleanup, and Phase 2 cuts
-the **v2** release with cross-platform executables.
+The current tree ships as **v1** plus Phase 1.7 image export. One more build
+pass (Phase 1.8) closes out TUI theming and structural cleanup, and Phase 2
+cuts the **v2** release with cross-platform executables.
 
 ---
 
@@ -51,33 +51,32 @@ the **v2** release with cross-platform executables.
 
 ---
 
-## Phase 1.7: Image Export [CURRENT]
+## Phase 1.7: Image Export [COMPLETED]
 
 **Goal**: produce a shareable colour image of the ASCII art that a `.txt` file
 cannot carry.
 
-- [ ] **Grid intermediate representation** — `ConvertGrid(img, opts) [][]Cell`
-  where each `Cell` is `{Ch rune, R, G, B uint8}`. `Convert` becomes
-  "grid → ANSI string" with byte-identical output (extend `converter_test.go` to
-  prove it).
-- [ ] **Collapse `ConvertToDiscord`** onto `ConvertGrid` ("grid → 16-colour
-  ANSI"), deleting its parallel sampling loop, luminance math, and palette
-  matcher.
-- [ ] **`RenderPNG(grid, style)`** — draw each cell's glyph in its colour on a
-  dark background. Bundle **DejaVu Sans Mono** via `//go:embed` (covers the
-  `░▒▓█` block and `⠿` braille ramp glyphs); render with
-  `golang.org/x/image/font/opentype` + `font.Drawer` (already in the dependency
-  tree). Image size = `cols × cellW` by `rows × cellH`, with a cell-size / scale
-  knob.
-- [ ] **Export modal → two options** — replace the plain-text / Discord toggle
-  with **Plain text (`.txt`)** and **Image (`.png`)**, auto-swapping the path
-  extension with the format.
+- [x] **Grid intermediate representation** — `ConvertGrid(img, opts) [][]Cell`
+  where each `Cell` is `{Ch rune, R, G, B uint8}`. `Convert` is now
+  `renderANSI(ConvertGrid(...))`; a golden test in `converter_test.go` plus an
+  offline 7,824-case sweep confirm byte-identical output.
+- [x] **Collapse `ConvertToDiscord`** onto `ConvertGrid` ("grid → 16-colour
+  ANSI"), deleting its parallel sampling loop, luminance math, and dimension
+  solver; the palette matcher is now the package-level `closestDiscordANSI`.
+- [x] **`RenderPNG(grid, scale)`** — draws each cell's glyph in its colour on a
+  near-black background. **DejaVu Sans Mono** is bundled via `//go:embed`
+  (`internal/ascii/fonts/`, covers the `░▒▓█` block and `⠿` braille glyphs);
+  rendered with `golang.org/x/image/font/opentype` + `font.Drawer`. Cell metrics
+  come from the face; `scale` multiplies the font size and output resolution.
+- [x] **Export modal → two options** — the format toggle is now **Plain text
+  (`.txt`)** / **Image (`.png`)**; toggling swaps the path extension while
+  keeping the user's stem (`swapExportExt`).
 
 **Cleanup carried in this pass** (entangled with the converter refactor):
 
-- [ ] Hoist `fontAspect = 0.46` to one package-level `const` in `ascii`.
-- [ ] Drop the standalone `d` Discord quick-export shortcut and its footer entry
-  (`--discord` flag stays).
+- [x] Hoist `fontAspect = 0.46` to one package-level `const` in `ascii`.
+- [x] Drop the standalone `d` Discord quick-export shortcut, its `exportToDiscord`
+  handler, and its footer entry (`--discord` flag stays).
 - [x] Remove `--server` HTTP mode, `CatServer`, all handlers, `safeImgDir`, and
   the Dockerfile — out of scope for a TUI-only tool. `main.go` is now a ~135-line
   dispatcher. The former `allowedExts` map is replaced by `imgsrc.SupportedExts`.
