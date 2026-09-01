@@ -12,8 +12,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"cats/internal/ascii"
-	"cats/internal/config"
+	"github.com/rvyyv-n/catgen/internal/ascii"
+	"github.com/rvyyv-n/catgen/internal/config"
 )
 
 func tempPNG(t *testing.T, w, h int) string {

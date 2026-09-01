@@ -14,9 +14,9 @@ import (
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"cats/internal/ascii"
-	"cats/internal/imgsrc"
-	"cats/internal/presets"
+	"github.com/rvyyv-n/catgen/internal/ascii"
+	"github.com/rvyyv-n/catgen/internal/imgsrc"
+	"github.com/rvyyv-n/catgen/internal/presets"
 )
 
 // updateOverlay routes key input to the handler for the active modal.

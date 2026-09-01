@@ -129,22 +129,25 @@ structural redundancy before cutting v2.
 
 ## Phase 2: v2 Release
 
-**Goal**: ship CATGEN v2 as ready-to-run executables.
+**Goal**: ship CATGEN v2 as ready-to-run executables for a general
+image-to-ASCII audience.
 
-- [ ] **Curate the bundled image set** — the user is auditing `images/` by hand,
-  dropping frames that convert poorly to ASCII (text / logo overlays, busy
-  backgrounds, low-contrast or tiny subjects).
-- [x] **`scripts/release.ps1`** — cross-compiles the `windows/amd64`,
-  `darwin/{amd64,arm64}` and `linux/{amd64,arm64}` matrix with
-  `-trimpath -ldflags "-s -w -X main.version=..."` and `CGO_ENABLED=0`, then
-  assembles one clean folder + zip per target under `dist/`: `catgen(.exe)` +
-  `images/` + an empty `exports/` + `README.md`, no source.
-- [ ] Run `scripts/release.ps1 -Version v2.0.0` and cut a GitHub Release with
-  the five zips attached and notes covering image export, chrome themes, and
-  the exports browser.
-- [ ] Final `README.md` pass: screenshots / cast of the studio, install steps per
-  platform.
-- [ ] Tag **v2.0.0**.
+- [x] **Curate the bundled image set** — trimmed to 27 large-subject images
+  that translate cleanly to ASCII (`images/` is ~5 MB, down from ~17 MB).
+- [x] **Module path** — `module cats` → `github.com/rvyyv-n/catgen` so
+  `go install github.com/rvyyv-n/catgen/cmd/catgen@latest` works.
+- [x] **`scripts/release.ps1`** — cross-compiles Windows x64/ARM64, Linux
+  x64/ARM64 and macOS ARM64 with `-trimpath -ldflags "-s -w -X main.version=..."`
+  and `CGO_ENABLED=0`, then assembles one clean folder + zip per target under
+  `dist/`: `catgen(.exe)` + `images/` + an empty `exports/` + `README.md`, no
+  source. macOS archives are labelled `macos` for clarity.
+- [x] **README rewrite** — reframed as a general image-to-ASCII studio (cat
+  sample art kept); per-platform install table, controls, config paths.
+- [ ] Add the studio screenshots to `README.md` (hero, a second theme, a PNG
+  export sample; CLI shot optional).
+- [ ] Run `scripts/release.ps1 -Version v2.0.0`, cut the GitHub Release with the
+  five zips + notes (image export, PNG render, themes, exports browser), tag
+  **v2.0.0**.
 
 *This is the end of the roadmap. CATGEN is a finished TUI tool at v2 — no web
 app, no server, no further phases planned.*

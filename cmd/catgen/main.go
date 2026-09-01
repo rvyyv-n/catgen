@@ -19,9 +19,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"cats/internal/ascii"
-	"cats/internal/imgsrc"
-	"cats/internal/tui"
+	"github.com/rvyyv-n/catgen/internal/ascii"
+	"github.com/rvyyv-n/catgen/internal/imgsrc"
+	"github.com/rvyyv-n/catgen/internal/tui"
 )
 
 // version is stamped at build time via -ldflags "-X main.version=...".

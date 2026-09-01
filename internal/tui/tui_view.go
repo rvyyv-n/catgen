@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"cats/internal/ascii"
+	"github.com/rvyyv-n/catgen/internal/ascii"
 )
 
 // radioMarker renders the marker for a radio row: a green check for the active
@@ -117,7 +117,7 @@ func (m Model) View() string {
 	})
 	allRows = append(allRows, RenderedRow{
 		isSection: true,
-		text:      lipgloss.PlaceHorizontal(innerLeftW, lipgloss.Center, subLogoStyle.Render("── ASCII Cat Studio ──")),
+		text:      lipgloss.PlaceHorizontal(innerLeftW, lipgloss.Center, subLogoStyle.Render("── ASCII Art Studio ──")),
 	})
 	allRows = append(allRows, RenderedRow{isSection: true, text: ""})
 

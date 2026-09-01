@@ -1,4 +1,4 @@
-module cats
+module github.com/rvyyv-n/catgen
 
 go 1.25.0
 

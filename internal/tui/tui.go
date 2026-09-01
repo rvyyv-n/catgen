@@ -12,10 +12,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"cats/internal/ascii"
-	"cats/internal/config"
-	"cats/internal/imgsrc"
-	"cats/internal/presets"
+	"github.com/rvyyv-n/catgen/internal/ascii"
+	"github.com/rvyyv-n/catgen/internal/config"
+	"github.com/rvyyv-n/catgen/internal/imgsrc"
+	"github.com/rvyyv-n/catgen/internal/presets"
 )
 
 // --- Color Palette ---
