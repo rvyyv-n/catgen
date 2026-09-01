@@ -5,9 +5,9 @@ interactive Bubble Tea TUI, and a headless CLI. It is deliberately scoped as a
 TUI app in the spirit of BANGEN — there is no web app, no HTTP server, and no
 plan to add other surfaces.
 
-The current tree ships as **v1** plus Phases 1.7–1.8 (image export, chrome
-themes, layout polish, structural cleanup). Phase 1.9 adds an exports browser
-and Phase 2 cuts the **v2** release with cross-platform executables.
+The current tree ships as **v1** plus Phases 1.7–1.9 (image export, chrome
+themes, layout polish, structural cleanup, exports browser). Phase 2 cuts the
+**v2** release with cross-platform executables.
 
 ---
 
@@ -108,13 +108,15 @@ structural redundancy before cutting v2.
 
 ---
 
-## Phase 1.9: Exports Tab
+## Phase 1.9: Exports Tab [COMPLETED]
 
 **Goal**: let the studio manage what it has produced.
 
-- [ ] A fourth TUI view listing `exports/` newest-first: `Enter` opens the file
-  in the OS viewer, `c` copies it (or its path), `d` / `Backspace` deletes it
-  with a confirm.
+- [x] `x` opens an exports browser (`overlayExports`) listing `exports/`
+  newest-first with each file's size and age: `↑↓` move, `Enter` opens the file
+  in the OS viewer (`start` / `open` / `xdg-open`), `c` copies its absolute path
+  to the clipboard, `d` / `Backspace` deletes it after a one-key confirm. The
+  `atotto/clipboard` dependency is promoted from indirect to direct.
 
 ---
 

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -291,5 +292,65 @@ func TestChromeCyclePersists(t *testing.T) {
 	m2 := NewModel("images", nil)
 	if m2.ChromeIdx != m.ChromeIdx {
 		t.Errorf("reloaded ChromeIdx = %d, want %d", m2.ChromeIdx, m.ChromeIdx)
+	}
+}
+
+func TestExportsBrowserListsNewestFirstAndDeletes(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.MkdirAll(exportDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Three files with increasing mtimes; "new.txt" is the most recent.
+	for i, name := range []string{"old.txt", "mid.txt", "new.txt"} {
+		p := filepath.Join(exportDir, name)
+		if err := os.WriteFile(p, []byte(name), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		os.Chtimes(p, time.Now(), time.Now().Add(time.Duration(i)*time.Hour))
+	}
+
+	m := sized(NewModel("images", nil))
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	m = next.(Model)
+	if m.overlay != overlayExports {
+		t.Fatalf("overlay = %v, want overlayExports", m.overlay)
+	}
+	if len(m.exportList) != 3 || m.exportList[0].Name != "new.txt" {
+		t.Fatalf("exportList = %+v, want newest-first with new.txt on top", m.exportList)
+	}
+
+	// First d arms the confirm, second d deletes.
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m = next.(Model)
+	if !m.exportListPending {
+		t.Fatal("first d did not arm the delete confirm")
+	}
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m = next.(Model)
+	if len(m.exportList) != 2 {
+		t.Fatalf("after confirm, exportList has %d entries, want 2", len(m.exportList))
+	}
+	if _, err := os.Stat(filepath.Join(exportDir, "new.txt")); !os.IsNotExist(err) {
+		t.Error("new.txt was not deleted")
+	}
+
+	// Esc closes back to the main view.
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = next.(Model)
+	if m.overlay != overlayNone {
+		t.Errorf("Esc did not close the exports browser: %v", m.overlay)
+	}
+}
+
+func TestExportsBrowserEmptyState(t *testing.T) {
+	t.Chdir(t.TempDir())
+	m := sized(NewModel("images", nil))
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	m = next.(Model)
+	if len(m.exportList) != 0 {
+		t.Fatalf("exportList = %+v, want empty", m.exportList)
+	}
+	if body := m.exportsModalBody(); !strings.Contains(body, "no exports yet") {
+		t.Errorf("empty body = %q", body)
 	}
 }

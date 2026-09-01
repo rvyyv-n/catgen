@@ -58,6 +58,7 @@ go run ./cmd/catgen
 | `o` | Open any image by path or URL |
 | `r` | Load random cat |
 | `s` / `p` | Save look preset / pick a preset |
+| `x` | Browse `exports/` — `Enter` open · `c` copy path · `d` delete |
 | `c` | Cycle the chrome colour scheme (persisted) |
 | `a` | Toggle fit-info in the footer |
 | `e` | Export via modal — plain text (`.txt`) or image (`.png`) to `exports/`, editable path, overwrite confirm |

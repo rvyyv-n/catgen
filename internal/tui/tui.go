@@ -112,6 +112,7 @@ const (
 	overlaySavePreset
 	overlayExport
 	overlayLoadPreset
+	overlayExports
 )
 
 type MenuItem struct {
@@ -171,6 +172,11 @@ type Model struct {
 	exportPNG     bool // false = plain text (.txt), true = image (.png)
 	exportField   int  // 0 = format toggle, 1 = output path
 	exportPending bool // path exists; the next Enter overwrites
+
+	// Exports browser overlay
+	exportList        []exportEntry
+	exportListCursor  int
+	exportListPending bool // the highlighted row's next d/Backspace deletes it
 
 	// Decoded-image cache so re-renders (and remote URLs) don't reload every keystroke
 	curImg    image.Image
@@ -358,6 +364,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.presetNames = names
 			m.presetCursor = 0
 			m.overlay = overlayLoadPreset
+			return m, nil
+
+		case "x":
+			m.exportList = listExports()
+			m.exportListCursor = 0
+			m.exportListPending = false
+			m.overlay = overlayExports
+			m.statusMsg = ""
 			return m, nil
 
 		case "a":

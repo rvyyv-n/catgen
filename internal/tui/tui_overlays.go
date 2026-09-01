@@ -4,9 +4,14 @@ import (
 	"bytes"
 	"image/png"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"sort"
 	"strings"
+	"time"
 
+	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"cats/internal/ascii"
@@ -25,8 +30,133 @@ func (m Model) updateOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateLoadPreset(msg)
 	case overlayExport:
 		return m.updateExport(msg)
+	case overlayExports:
+		return m.updateExports(msg)
 	}
 	return m, nil
+}
+
+// exportEntry is one file listed by the exports browser.
+type exportEntry struct {
+	Name    string
+	Path    string
+	Size    int64
+	ModTime time.Time
+}
+
+// listExports returns the regular files in the exports directory, newest first.
+func listExports() []exportEntry {
+	dirEntries, err := os.ReadDir(exportDir)
+	if err != nil {
+		return nil
+	}
+	out := make([]exportEntry, 0, len(dirEntries))
+	for _, de := range dirEntries {
+		if de.IsDir() {
+			continue
+		}
+		info, err := de.Info()
+		if err != nil {
+			continue
+		}
+		out = append(out, exportEntry{
+			Name:    de.Name(),
+			Path:    filepath.Join(exportDir, de.Name()),
+			Size:    info.Size(),
+			ModTime: info.ModTime(),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ModTime.After(out[j].ModTime) })
+	return out
+}
+
+// openInViewer hands a path to the OS's default handler.
+func openInViewer(path string) error {
+	switch runtime.GOOS {
+	case "windows":
+		return exec.Command("cmd", "/c", "start", "", path).Start()
+	case "darwin":
+		return exec.Command("open", path).Start()
+	default:
+		return exec.Command("xdg-open", path).Start()
+	}
+}
+
+// updateExports drives the exports browser: navigate the list, Enter opens the
+// file, c copies its path, d / Backspace deletes it after a confirm.
+func (m Model) updateExports(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "ctrl+c", "q", "x":
+		m.overlay = overlayNone
+		return m, nil
+
+	case "up", "k":
+		if m.exportListCursor > 0 {
+			m.exportListCursor--
+		}
+		m.exportListPending = false
+
+	case "down", "j":
+		if m.exportListCursor < len(m.exportList)-1 {
+			m.exportListCursor++
+		}
+		m.exportListPending = false
+
+	case "enter", " ":
+		if e, ok := m.currentExport(); ok {
+			if err := openInViewer(e.Path); err != nil {
+				m.statusMsg = "✗ " + condenseErr(err)
+			} else {
+				m.statusMsg = "✓ Opened " + e.Name
+			}
+		}
+
+	case "c":
+		if e, ok := m.currentExport(); ok {
+			abs, err := filepath.Abs(e.Path)
+			if err != nil {
+				abs = e.Path
+			}
+			if err := clipboard.WriteAll(abs); err != nil {
+				m.statusMsg = "✗ " + condenseErr(err)
+			} else {
+				m.statusMsg = "✓ Copied path to clipboard"
+			}
+		}
+
+	case "d", "backspace":
+		e, ok := m.currentExport()
+		if !ok {
+			return m, nil
+		}
+		if !m.exportListPending {
+			m.exportListPending = true
+			m.statusMsg = "Delete " + e.Name + "? press d again"
+			return m, nil
+		}
+		if err := os.Remove(e.Path); err != nil {
+			m.statusMsg = "✗ " + condenseErr(err)
+		} else {
+			m.statusMsg = "✓ Deleted " + e.Name
+		}
+		m.exportListPending = false
+		m.exportList = listExports()
+		if m.exportListCursor >= len(m.exportList) {
+			m.exportListCursor = len(m.exportList) - 1
+		}
+		if m.exportListCursor < 0 {
+			m.exportListCursor = 0
+		}
+	}
+	return m, nil
+}
+
+// currentExport returns the highlighted entry, if any.
+func (m Model) currentExport() (exportEntry, bool) {
+	if m.exportListCursor < 0 || m.exportListCursor >= len(m.exportList) {
+		return exportEntry{}, false
+	}
+	return m.exportList[m.exportListCursor], true
 }
 
 // updateOpenImage drives the open-image overlay: Enter loads the typed

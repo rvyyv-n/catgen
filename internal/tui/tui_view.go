@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -265,6 +266,8 @@ func (m Model) View() string {
 		mainLayout = centeredModal("Export", m.exportModalBody(), totalW, contentH)
 	case overlayLoadPreset:
 		mainLayout = centeredModal("Load Preset", m.presetModalBody(), totalW, contentH)
+	case overlayExports:
+		mainLayout = centeredModal("Exports", m.exportsModalBody(), totalW, contentH)
 	}
 
 	// --- Footer: context hint for the active overlay, keybinds otherwise ---
@@ -278,6 +281,8 @@ func (m Model) View() string {
 		footer = hintFooter("↑↓ field · ←→ format · Enter write · Esc cancel", m.statusMsg, totalW)
 	case overlayLoadPreset:
 		footer = hintFooter("↑↓ move · Enter load · Esc cancel", m.statusMsg, totalW)
+	case overlayExports:
+		footer = hintFooter("↑↓ move · Enter open · c copy path · d delete · Esc close", m.statusMsg, totalW)
 	default:
 		footerItems := lipgloss.JoinHorizontal(lipgloss.Top,
 			footerKeyStyle.Render("↑↓"), footerDescStyle.Render(" nav  "),
@@ -288,6 +293,7 @@ func (m Model) View() string {
 			footerKeyStyle.Render("e"), footerDescStyle.Render(" export  "),
 			footerKeyStyle.Render("s"), footerDescStyle.Render(" save  "),
 			footerKeyStyle.Render("p"), footerDescStyle.Render(" presets  "),
+			footerKeyStyle.Render("x"), footerDescStyle.Render(" exports  "),
 			footerKeyStyle.Render("c"), footerDescStyle.Render(" chrome  "),
 			footerKeyStyle.Render("a"), footerDescStyle.Render(" info  "),
 			footerKeyStyle.Render("q"), footerDescStyle.Render(" quit"),
@@ -388,4 +394,54 @@ func (m Model) presetModalBody() string {
 		}
 	}
 	return strings.Join(rows, "\n")
+}
+
+// exportsModalBody renders the exports browser: one row per file with its size
+// and age, newest first.
+func (m Model) exportsModalBody() string {
+	if len(m.exportList) == 0 {
+		return "  (no exports yet — press e to make one)"
+	}
+	rows := make([]string, len(m.exportList))
+	for i, e := range m.exportList {
+		meta := fmt.Sprintf("%9s · %s", humanSize(e.Size), humanAge(time.Since(e.ModTime)))
+		line := fmt.Sprintf("%-28s %s", truncName(e.Name, 28), meta)
+		if i == m.exportListCursor {
+			rows[i] = lipgloss.NewStyle().Foreground(colorTeal).Bold(true).Render("► " + line)
+		} else {
+			rows[i] = "  " + line
+		}
+	}
+	return strings.Join(rows, "\n")
+}
+
+func humanSize(n int64) string {
+	switch {
+	case n >= 1<<20:
+		return fmt.Sprintf("%.1f MB", float64(n)/(1<<20))
+	case n >= 1<<10:
+		return fmt.Sprintf("%.0f KB", float64(n)/(1<<10))
+	default:
+		return fmt.Sprintf("%d B", n)
+	}
+}
+
+func humanAge(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	}
+}
+
+func truncName(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return s[:max-1] + "…"
 }
