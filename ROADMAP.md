@@ -149,7 +149,7 @@ general image-to-ASCII audience.
   platform label, so every binary has a matching source download beside it.
 - [x] **README rewrite** — reframed as a general image-to-ASCII studio (cat
   sample art kept); per-platform install table, controls, config paths.
-- [ ] Add the studio screenshots to `README.md` (hero, a second theme, a PNG
+- [x] Add the studio screenshots to `README.md` (hero, a second theme, a PNG
   export sample; CLI shot optional).
 - [ ] Run `scripts/release.ps1 -Version v1.0.0`, cut the GitHub Release with
   the three binaries + three source zips and notes (image export, PNG render,

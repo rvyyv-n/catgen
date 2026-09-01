@@ -16,6 +16,7 @@ import (
 	"github.com/rvyyv-n/catgen/internal/config"
 	"github.com/rvyyv-n/catgen/internal/imgsrc"
 	"github.com/rvyyv-n/catgen/internal/presets"
+	"github.com/rvyyv-n/catgen/internal/samples"
 )
 
 // --- Color Palette ---
@@ -191,8 +192,11 @@ type Model struct {
 func NewModel(imageDir string, images []string) Model {
 	entries := make([]imageEntry, 0, len(images))
 	for _, rel := range images {
+		// Embedded sample refs are "embedded:<name>" so imgsrc can still
+		// resolve them from the compiled-in pool; strip that prefix for
+		// display so the menu shows the original filename, not "embedded:...".
 		entries = append(entries, imageEntry{
-			Display: filepath.Base(rel),
+			Display: filepath.Base(strings.TrimPrefix(rel, samples.Prefix)),
 			Path:    filepath.Join(imageDir, filepath.FromSlash(rel)),
 		})
 	}

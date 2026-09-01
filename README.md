@@ -63,7 +63,7 @@ Run `catgen` with no arguments:
 catgen
 ```
 
-<!-- screenshot: hero -->
+![CATGEN TUI: controls pane on the left, live preview on the right](docs/screenshots/hero.png)
 
 Left pane is the controls, right pane is a live preview that re-renders on every
 change.
@@ -101,7 +101,7 @@ Seven UI colour schemes — `teal`, `amber`, `magenta`, `green`, `ocean`,
 `violet`, `mono` — cycled with `t` and saved to `~/.catgen/config.json`. These
 are the studio chrome, separate from the art palettes.
 
-<!-- screenshot: theme -->
+![The amber chrome theme](docs/screenshots/theme.png)
 
 ### Image export
 
@@ -110,7 +110,9 @@ are the studio chrome, separate from the art palettes.
 dark background, using an embedded DejaVu Sans Mono so the block and braille
 ramps render correctly — to a `.png` you can share anywhere a text file can't go.
 
-<!-- screenshot: png-export -->
+![The export modal, format toggle set to Image (PNG)](docs/screenshots/export-modal.png)
+
+![A PNG export opened in an image viewer](docs/screenshots/png-export.png)
 
 ---
 
