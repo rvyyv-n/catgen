@@ -20,9 +20,9 @@
       `*-*   `*-*  `*-*'
 ```
 
-**CATGEN** turns any image into ASCII art in your terminal. It is a Go
-image-to-ASCII engine wrapped in an interactive TUI studio and a headless CLI —
-no web app, no server, just the terminal. It ships with a pool of sample images
+**CATGEN** turns any image into ASCII art in your terminal. It is an
+Image-to-ASCII engine wrapped in an interactive TUI and a headless CLI —
+no web app, no server, just the terminal. Ships with a pool of sample images
 (cats, naturally) so it does something the moment you run it.
 
 ---
@@ -84,7 +84,7 @@ change.
 | `a` | Toggle fit info in the footer |
 | `q` / `Ctrl+C` | Quit |
 
-### Rendering options
+### Rendering Options
 
 - **Fit Mode / Width** — `Auto` fits the preview pane; `Compact` / `Wide` / `Max`
   are quick presets; adjusting `Width` switches to `Custom` and renders at that
@@ -157,7 +157,7 @@ catgen --version
 
 ---
 
-## Building from source
+## Building from Source
 
 ```bash
 # Local build
