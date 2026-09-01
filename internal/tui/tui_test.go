@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"cats/internal/ascii"
+	"cats/internal/config"
 )
 
 func tempPNG(t *testing.T, w, h int) string {
@@ -243,12 +244,52 @@ func TestSwapExportExt(t *testing.T) {
 		{"cat_ascii.png", false, "cat_ascii.txt"},
 		{"art/my cat.txt", true, "art/my cat.png"},
 		{"noext", true, "noext.png"},
-		{"", true, "cat_ascii.png"},
-		{"", false, "cat_ascii.txt"},
+		{"", true, defaultExportPath(true)},
+		{"", false, defaultExportPath(false)},
 	}
 	for _, c := range cases {
 		if got := swapExportExt(c.in, c.png); got != c.want {
 			t.Errorf("swapExportExt(%q, %v) = %q, want %q", c.in, c.png, got, c.want)
 		}
+	}
+}
+
+func TestDefaultExportPathInExportsDir(t *testing.T) {
+	if got := defaultExportPath(true); filepath.Dir(got) != exportDir {
+		t.Errorf("defaultExportPath(png) = %q, want it under %q", got, exportDir)
+	}
+	if got := defaultExportPath(false); filepath.Ext(got) != ".txt" {
+		t.Errorf("defaultExportPath(text) = %q, want .txt", got)
+	}
+}
+
+func TestChromeCyclePersists(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Cleanup(func() { applyChrome(0) }) // restore package globals for other tests
+
+	m := sized(NewModel("images", nil))
+	start := m.ChromeIdx
+
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	m = next.(Model)
+
+	if m.ChromeIdx != (start+1)%len(chromeSchemes) {
+		t.Fatalf("ChromeIdx = %d, want %d", m.ChromeIdx, (start+1)%len(chromeSchemes))
+	}
+	want := chromeSchemes[m.ChromeIdx]
+	if colorBorder != want.Border || colorTeal != want.Accent {
+		t.Errorf("applyChrome did not set colours: border=%v accent=%v want %v/%v",
+			colorBorder, colorTeal, want.Border, want.Accent)
+	}
+	if cfg := config.Load(); cfg.Chrome != want.Name {
+		t.Errorf("config.Chrome = %q, want %q", cfg.Chrome, want.Name)
+	}
+
+	// A fresh model restores the persisted scheme.
+	m2 := NewModel("images", nil)
+	if m2.ChromeIdx != m.ChromeIdx {
+		t.Errorf("reloaded ChromeIdx = %d, want %d", m2.ChromeIdx, m.ChromeIdx)
 	}
 }

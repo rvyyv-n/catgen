@@ -5,9 +5,9 @@ interactive Bubble Tea TUI, and a headless CLI. It is deliberately scoped as a
 TUI app in the spirit of BANGEN — there is no web app, no HTTP server, and no
 plan to add other surfaces.
 
-The current tree ships as **v1** plus Phase 1.7 image export. One more build
-pass (Phase 1.8) closes out TUI theming and structural cleanup, and Phase 2
-cuts the **v2** release with cross-platform executables.
+The current tree ships as **v1** plus Phases 1.7–1.8 (image export, chrome
+themes, layout polish, structural cleanup). Phase 1.9 adds an exports browser
+and Phase 2 cuts the **v2** release with cross-platform executables.
 
 ---
 
@@ -81,20 +81,40 @@ cannot carry.
   the Dockerfile — out of scope for a TUI-only tool. `main.go` is now a ~135-line
   dispatcher. The former `allowedExts` map is replaced by `imgsrc.SupportedExts`.
 
-## Phase 1.8: TUI Color Themes & Codebase Cleanup
+## Phase 1.8: TUI Chrome Themes, Layout Polish & Cleanup [COMPLETED]
 
-**Goal**: let the studio chrome match the art, and pay down the remaining
+**Goal**: let the studio chrome match the art, tighten the layout, and pay down
 structural redundancy before cutting v2.
 
-- [ ] **TUI color schemes** — a small set of built-in chrome palettes
-  (border / selection / accent / text), a key to cycle them, persisted to
-  `~/.catgen/config.json` and restored on next launch. Separate from the ASCII
+- [x] **TUI chrome schemes** — five built-in palettes (`teal`, `amber`,
+  `magenta`, `green`, `mono`) setting border / accent / section / text colours;
+  `c` cycles them, the choice persists to `~/.catgen/config.json`
+  (`internal/config`) and is restored on next launch. Separate from the ASCII
   art themes; no custom palette editing.
-- [ ] **Split `internal/tui/tui.go`** (~1200 lines) along its natural seams:
-  `tui.go` (model + `Update`), `tui_overlays.go` (overlay handlers + modal
-  rendering), `tui_view.go` (`View` + `buildFramedBox` + helpers).
-- [ ] **General trim** — remove any remaining dead code, redundant helpers, and
-  stale comments surfaced by the theme and split work.
+- [x] **Split `internal/tui/tui.go`** into `tui.go` (model, `Update`, adjust
+  handlers), `tui_overlays.go` (overlay input handlers + overlay actions +
+  modal bodies), `tui_view.go` (`View`, `buildFramedBox`, framing helpers).
+- [x] **Layout hug** — the controls and Live Preview frames size to their
+  content instead of stretching to the whole terminal, removing the large empty
+  border a small render used to sit inside.
+- [x] **"Auto Fit" → "Auto"** label in the Fit Mode control (modes unchanged).
+- [x] **`exports/` folder** — TUI exports default to `exports/cat_ascii.{png,txt}`,
+  created on write and git-ignored, so user output is not mixed into the tree.
+- [x] **Repo tidy** — `main` package and its Windows icon assets moved to
+  `cmd/catgen/`; repo root is now `go.{mod,sum}`, `README.md`, `ROADMAP.md`,
+  `images/`, `cmd/`, `internal/`.
+- [x] **General trim** — dropped the unused `headerStyle`; collapsed the colour
+  block around the chrome system.
+
+---
+
+## Phase 1.9: Exports Tab
+
+**Goal**: let the studio manage what it has produced.
+
+- [ ] A fourth TUI view listing `exports/` newest-first: `Enter` opens the file
+  in the OS viewer, `c` copies it (or its path), `d` / `Backspace` deletes it
+  with a confirm.
 
 ---
 
@@ -102,10 +122,11 @@ structural redundancy before cutting v2.
 
 **Goal**: ship CATGEN v2 as ready-to-run executables.
 
-- [ ] **Curate the bundled image set** — review `images/` and drop frames that
-  convert poorly to ASCII (text / logo overlays, busy backgrounds, low-contrast
-  or tiny subjects); keep the built-in carousel to a tight, high-quality default
-  set. Candidate list gets human sign-off before deletion.
+- [ ] **Curate the bundled image set** — the user is auditing `images/` by hand,
+  dropping frames that convert poorly to ASCII (text / logo overlays, busy
+  backgrounds, low-contrast or tiny subjects).
+- [ ] Package each target as a clean folder — `catgen(.exe)` + `images/` +
+  empty `exports/` + `README.md`, no source.
 - [ ] Cross-compile Windows / macOS / Linux binaries (`GOOS`/`GOARCH` matrix),
   `-trimpath -ldflags "-s -w -X main.version=..."`.
 - [ ] Cut a GitHub Release with the binaries attached and notes covering image
