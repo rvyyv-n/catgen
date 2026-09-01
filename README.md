@@ -103,7 +103,7 @@ are the studio chrome, separate from the art palettes.
 
 ![The amber chrome theme](docs/screenshots/theme.png)
 
-### Image export
+### Image Export
 
 `e` opens the export modal. **Plain text** writes the ANSI-free characters to a
 `.txt`. **Image (PNG)** rasterises the art — every glyph drawn in its colour on a
@@ -173,4 +173,28 @@ go generate ./...
 # All release assets: one binary + one source zip per platform
 # (Windows x64, Linux x64, macOS ARM64) under dist/
 pwsh scripts/release.ps1 -Version v1.0.0
+```
+
+---
+
+## Project Layout
+
+```text
+catgen/
+├── cmd/
+│   └── catgen/       # main package: flag parsing, CLI/TUI dispatch
+├── internal/
+│   ├── ascii/         # the converter: image -> character grid -> ANSI/PNG
+│   ├── config/        # ~/.catgen/config.json (persisted UI theme)
+│   ├── imgsrc/        # path / ~path / URL / embedded-ref image loading
+│   ├── presets/       # look presets (~/.catgen/presets/*.json)
+│   ├── samples/       # the embedded sample image pool (//go:embed)
+│   └── tui/           # the Bubble Tea studio: model, view, overlays
+├── docs/
+│   └── screenshots/   # images used in this README
+├── scripts/
+│   └── release.ps1    # cross-compile + package a GitHub release
+├── go.mod / go.sum
+├── README.md
+└── ROADMAP.md
 ```
