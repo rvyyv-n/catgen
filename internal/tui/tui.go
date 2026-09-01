@@ -50,12 +50,15 @@ type chromeScheme struct {
 	Text    lipgloss.Color
 }
 
-// chromeSchemes is the built-in chrome catalog. Index 0 is the historical look.
+// chromeSchemes is the built-in chrome catalog, cycled by the `t` key. Index 0
+// is the historical look. Fields: Name, Accent, Section, Border, Text.
 var chromeSchemes = []chromeScheme{
 	{"teal", "86", "205", "37", "252"},
 	{"amber", "214", "208", "94", "223"},
 	{"magenta", "213", "212", "89", "255"},
 	{"green", "83", "40", "28", "252"},
+	{"ocean", "39", "75", "24", "252"},
+	{"violet", "141", "177", "54", "253"},
 	{"mono", "252", "245", "240", "252"},
 }
 
@@ -425,14 +428,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.input.CursorEnd()
 			return m, nil
 
-		case "c":
+		case "t":
 			m.ChromeIdx = (m.ChromeIdx + 1) % len(chromeSchemes)
 			applyChrome(m.ChromeIdx)
 			name := chromeSchemes[m.ChromeIdx].Name
 			if err := config.Save(config.Config{Chrome: name}); err != nil {
 				m.statusMsg = "✗ " + condenseErr(err)
 			} else {
-				m.statusMsg = "✓ Chrome: " + name
+				m.statusMsg = "✓ Theme: " + name
 			}
 		}
 

@@ -261,14 +261,29 @@ func (m Model) View() string {
 		pairs := []struct{ key, desc string }{
 			{"↑↓", "nav"}, {"↔", "adjust"}, {"⏎", "toggle"},
 			{"o", "open"}, {"r", "random"}, {"e", "export"}, {"s", "save"},
-			{"p", "presets"}, {"x", "exports"}, {"c", "chrome"}, {"a", "info"},
+			{"p", "presets"}, {"x", "exports"}, {"t", "themes"}, {"a", "info"},
 			{"q", "quit"},
 		}
-		// Drop the least-essential hints, in this order, until the bar fits.
+		var lead string
+		if m.statusMsg != "" {
+			lead = msgStyle.Render(m.statusMsg)
+		} else if m.showFitInfo && m.curImg != nil {
+			gw, gh := ascii.Measure(m.curImg, m.renderOpts())
+			b := m.curImg.Bounds()
+			lead = footerDescStyle.Render(fmt.Sprintf("fit:%s · src %dx%d · grid %dx%d",
+				fitModes[m.FitModeIdx], b.Dx(), b.Dy(), gw, gh))
+		}
+		leadW := 0
+		if lead != "" {
+			leadW = lipgloss.Width(lead) + 3 // + the "   " separator
+		}
+
+		// Drop the least-essential hints, in this order, until the whole line
+		// (lead + keybinds) fits without wrapping.
 		drop := []string{"nav", "adjust", "toggle", "info", "random", "save"}
 		footerItems := renderFooterKeys(pairs)
 		for _, d := range drop {
-			if footerFits(footerItems, totalW) {
+			if footerFits(footerItems, totalW-leadW) {
 				break
 			}
 			for i := range pairs {
@@ -280,15 +295,6 @@ func (m Model) View() string {
 			footerItems = renderFooterKeys(pairs)
 		}
 
-		var lead string
-		if m.statusMsg != "" {
-			lead = msgStyle.Render(m.statusMsg)
-		} else if m.showFitInfo && m.curImg != nil {
-			gw, gh := ascii.Measure(m.curImg, m.renderOpts())
-			b := m.curImg.Bounds()
-			lead = footerDescStyle.Render(fmt.Sprintf("fit:%s · src %dx%d · grid %dx%d",
-				fitModes[m.FitModeIdx], b.Dx(), b.Dy(), gw, gh))
-		}
 		if lead != "" {
 			footerItems = lipgloss.JoinHorizontal(lipgloss.Top, lead, "   ", footerItems)
 		}

@@ -86,11 +86,12 @@ cannot carry.
 **Goal**: let the studio chrome match the art, tighten the layout, and pay down
 structural redundancy before cutting v2.
 
-- [x] **TUI chrome schemes** — five built-in palettes (`teal`, `amber`,
-  `magenta`, `green`, `mono`) setting border / accent / section / text colours;
-  `c` cycles them, the choice persists to `~/.catgen/config.json`
-  (`internal/config`) and is restored on next launch. Separate from the ASCII
-  art themes; no custom palette editing.
+- [x] **TUI chrome schemes** — seven built-in palettes (`teal`, `amber`,
+  `magenta`, `green`, `ocean`, `violet`, `mono`) setting border / accent /
+  section / text colours; `t` cycles them, the choice persists to
+  `~/.catgen/config.json` (`internal/config`, JSON field `chrome`) and is
+  restored on next launch. Separate from the ASCII art palettes; no custom
+  palette editing.
 - [x] **Split `internal/tui/tui.go`** into `tui.go` (model, `Update`, adjust
   handlers), `tui_overlays.go` (overlay input handlers + overlay actions +
   modal bodies), `tui_view.go` (`View`, `buildFramedBox`, framing helpers).

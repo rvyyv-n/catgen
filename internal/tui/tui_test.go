@@ -327,7 +327,7 @@ func TestChromeCyclePersists(t *testing.T) {
 	m := sized(NewModel("images", nil))
 	start := m.ChromeIdx
 
-	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("t")})
 	m = next.(Model)
 
 	if m.ChromeIdx != (start+1)%len(chromeSchemes) {

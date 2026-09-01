@@ -34,7 +34,7 @@ written in Go. No web app, no server — just the terminal.
 - **Any Image Source**: convert any local file (`png`, `jpg`, `gif`, `webp`) or `http(s)` URL, not just the bundled cats.
 - **Image Tuning**: live brightness, contrast, inversion, and custom width scaling.
 - **Look Presets**: save and recall named looks from `~/.catgen/presets/`.
-- **Chrome Themes**: five built-in UI colour schemes (`teal`, `amber`, `magenta`, `green`, `mono`); `c` cycles, the choice is saved to `~/.catgen/config.json`.
+- **Chrome Themes**: seven built-in UI colour schemes (`teal`, `amber`, `magenta`, `green`, `ocean`, `violet`, `mono`); `t` cycles, the choice is saved to `~/.catgen/config.json`.
 - **Export**: plain-text (`.txt`) or a colour image (`.png`) of the art from the TUI, written to `exports/`; Discord-ready 34-column markdown codeblocks from the CLI.
 - **Headless CLI**: print ASCII straight to stdout.
 
@@ -59,7 +59,7 @@ go run ./cmd/catgen
 | `r` | Load random cat |
 | `s` / `p` | Save look preset / pick a preset |
 | `x` | Browse `exports/` — `Enter` open · `c` copy path · `d` delete |
-| `c` | Cycle the chrome colour scheme (persisted) |
+| `t` | Cycle the UI colour theme (persisted) |
 | `a` | Toggle fit-info in the footer |
 | `e` | Export via modal — plain text (`.txt`) or image (`.png`) to `exports/`, editable path, overwrite confirm |
 | `q` / `Ctrl+C` | Quit |
