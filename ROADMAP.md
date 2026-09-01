@@ -94,10 +94,16 @@ structural redundancy before cutting v2.
 - [x] **Split `internal/tui/tui.go`** into `tui.go` (model, `Update`, adjust
   handlers), `tui_overlays.go` (overlay input handlers + overlay actions +
   modal bodies), `tui_view.go` (`View`, `buildFramedBox`, framing helpers).
-- [x] **Layout hug** — the controls and Live Preview frames size to their
-  content instead of stretching to the whole terminal, removing the large empty
-  border a small render used to sit inside.
-- [x] **"Auto Fit" → "Auto"** label in the Fit Mode control (modes unchanged).
+- [x] **Full-size layout** — the controls and Live Preview frames stay
+  edge-to-edge for the whole terminal, BANGEN-style; only the art inside the
+  preview resizes. (An earlier "hug the content" experiment was reverted.)
+- [x] **Footer never wraps** — the keybind bar is width-capped and sheds its
+  least-essential hints (`nav`, `adjust`, `toggle`, `info`, …) on narrow
+  terminals instead of spilling onto a second line.
+- [x] **Width control fixed** — adjusting `Width` now switches to a `Custom`
+  fit mode that actually renders at `CustomW` (it previously fell through to the
+  hard-coded Compact width and did nothing).
+- [x] **"Auto Fit" → "Auto"** label in the Fit Mode control (all modes intact).
 - [x] **`exports/` folder** — TUI exports default to `exports/cat_ascii.{png,txt}`,
   created on write and git-ignored, so user output is not mixed into the tree.
 - [x] **Repo tidy** — `main` package and its Windows icon assets moved to

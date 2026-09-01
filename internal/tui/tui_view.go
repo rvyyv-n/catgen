@@ -87,6 +87,8 @@ func (m Model) View() string {
 		contentH = 8
 	}
 	innerLeftW := leftPaneW - 2
+	innerRightW := rightPaneW - 2
+	innerHeight := contentH - 2
 
 	// --- Left Pane (Controls) ---
 	type RenderedRow struct {
@@ -186,16 +188,6 @@ func (m Model) View() string {
 		}
 	}
 
-	// Size the controls frame to hug its content, capped at the terminal.
-	leftBoxH := len(allRows) + 2
-	if leftBoxH > contentH {
-		leftBoxH = contentH
-	}
-	if leftBoxH < 8 {
-		leftBoxH = 8
-	}
-	innerHeight := leftBoxH - 2
-
 	// Smooth scrolling for left pane
 	if cursorRow < m.scrollOff {
 		m.scrollOff = cursorRow
@@ -222,38 +214,20 @@ func (m Model) View() string {
 	}
 	leftBody := strings.Join(visibleTextLines, "\n")
 
-	leftBox := buildFramedBox("", leftBody, leftPaneW, leftBoxH, colorBorder, colorTeal)
+	leftBox := buildFramedBox("", leftBody, leftPaneW, contentH, colorBorder, colorTeal)
 
 	// --- Right Pane (Live Preview) ---
-	// Size the frame to hug the art instead of stretching to the whole pane,
-	// so a small render doesn't sit in a large empty box.
-	artW := lipgloss.Width(m.asciiArt)
-	artH := lipgloss.Height(m.asciiArt)
-
-	previewW := artW + 4
-	if previewW > rightPaneW {
-		previewW = rightPaneW
-	}
-	if previewW < 24 {
-		previewW = 24
-	}
-	previewH := artH + 2
-	if previewH > contentH {
-		previewH = contentH
-	}
-	if previewH < 8 {
-		previewH = 8
-	}
-
+	// The frame stays edge-to-edge; only the art inside it resizes. Centre the
+	// render in the full pane.
 	centeredArt := lipgloss.Place(
-		previewW-2,
-		previewH-2,
+		innerRightW,
+		innerHeight,
 		lipgloss.Center,
 		lipgloss.Center,
 		m.asciiArt,
 	)
 
-	rightBox := buildFramedBox("Live Preview", centeredArt, previewW, previewH, colorBorder, colorTeal)
+	rightBox := buildFramedBox("Live Preview", centeredArt, rightPaneW, contentH, colorBorder, colorTeal)
 
 	// Join the frames flush so the shared edge reads as one divider.
 	mainLayout := lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
@@ -284,20 +258,27 @@ func (m Model) View() string {
 	case overlayExports:
 		footer = hintFooter("↑↓ move · Enter open · c copy path · d delete · Esc close", m.statusMsg, totalW)
 	default:
-		footerItems := lipgloss.JoinHorizontal(lipgloss.Top,
-			footerKeyStyle.Render("↑↓"), footerDescStyle.Render(" nav  "),
-			footerKeyStyle.Render("↔"), footerDescStyle.Render(" adjust  "),
-			footerKeyStyle.Render("⏎"), footerDescStyle.Render(" toggle  "),
-			footerKeyStyle.Render("o"), footerDescStyle.Render(" open  "),
-			footerKeyStyle.Render("r"), footerDescStyle.Render(" random  "),
-			footerKeyStyle.Render("e"), footerDescStyle.Render(" export  "),
-			footerKeyStyle.Render("s"), footerDescStyle.Render(" save  "),
-			footerKeyStyle.Render("p"), footerDescStyle.Render(" presets  "),
-			footerKeyStyle.Render("x"), footerDescStyle.Render(" exports  "),
-			footerKeyStyle.Render("c"), footerDescStyle.Render(" chrome  "),
-			footerKeyStyle.Render("a"), footerDescStyle.Render(" info  "),
-			footerKeyStyle.Render("q"), footerDescStyle.Render(" quit"),
-		)
+		pairs := []struct{ key, desc string }{
+			{"↑↓", "nav"}, {"↔", "adjust"}, {"⏎", "toggle"},
+			{"o", "open"}, {"r", "random"}, {"e", "export"}, {"s", "save"},
+			{"p", "presets"}, {"x", "exports"}, {"c", "chrome"}, {"a", "info"},
+			{"q", "quit"},
+		}
+		// Drop the least-essential hints, in this order, until the bar fits.
+		drop := []string{"nav", "adjust", "toggle", "info", "random", "save"}
+		footerItems := renderFooterKeys(pairs)
+		for _, d := range drop {
+			if footerFits(footerItems, totalW) {
+				break
+			}
+			for i := range pairs {
+				if pairs[i].desc == d {
+					pairs = append(pairs[:i], pairs[i+1:]...)
+					break
+				}
+			}
+			footerItems = renderFooterKeys(pairs)
+		}
 
 		var lead string
 		if m.statusMsg != "" {
@@ -312,6 +293,10 @@ func (m Model) View() string {
 			footerItems = lipgloss.JoinHorizontal(lipgloss.Top, lead, "   ", footerItems)
 		}
 
+		// Hard cap the content width before aligning so it can never wrap onto
+		// a second line and break the layout.
+		footerItems = lipgloss.NewStyle().MaxWidth(totalW).Render(footerItems)
+
 		footer = lipgloss.NewStyle().
 			Width(totalW).
 			Align(lipgloss.Right).
@@ -319,6 +304,25 @@ func (m Model) View() string {
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, mainLayout, "", footer)
+}
+
+// renderFooterKeys joins key/description pairs into the main keybind bar.
+func renderFooterKeys(pairs []struct{ key, desc string }) string {
+	parts := make([]string, 0, len(pairs)*2)
+	for i, p := range pairs {
+		sep := "  "
+		if i == len(pairs)-1 {
+			sep = ""
+		}
+		parts = append(parts, footerKeyStyle.Render(p.key), footerDescStyle.Render(" "+p.desc+sep))
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, parts...)
+}
+
+// footerFits leaves a small margin for width-ambiguous glyphs (↑↓ ↔ ⏎) that
+// some terminals render wider than lipgloss measures.
+func footerFits(s string, totalW int) bool {
+	return lipgloss.Width(s) <= totalW-2
 }
 
 // inputFooter renders a labelled text-input line for the open-image and

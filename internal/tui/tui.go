@@ -90,7 +90,9 @@ func applyChrome(idx int) {
 var themes = ascii.Themes
 var ramps = ascii.Ramps
 
-var fitModes = []string{"Auto", "Compact", "Wide", "Max"}
+var fitModes = []string{"Auto", "Compact", "Wide", "Max", "Custom"}
+
+const fitCustom = 4 // index of the manual-width mode in fitModes
 
 // leftPaneW is the fixed width of the controls pane, including its border.
 const leftPaneW = 32
@@ -258,10 +260,16 @@ func (m *Model) buildMenu() {
 		Section: "General",
 		Label:   "Width",
 		ValueFunc: func(m *Model) string {
-			if m.FitModeIdx == 0 {
+			switch m.FitModeIdx {
+			case 1:
+				return "35"
+			case 2:
+				return "55"
+			case fitCustom:
+				return fmt.Sprintf("%d", m.CustomW)
+			default: // Auto, Max
 				return "Auto"
 			}
-			return fmt.Sprintf("%d", m.CustomW)
 		},
 	})
 
@@ -474,14 +482,17 @@ func (m *Model) handleAdjust(delta int) {
 		}
 
 	case "width":
+		// Adjusting Width switches to the manual-width mode and moves it.
+		if m.FitModeIdx != fitCustom {
+			m.FitModeIdx = fitCustom
+		}
 		m.CustomW += (delta * 5)
 		if m.CustomW < 15 {
 			m.CustomW = 15
 		}
-		if m.CustomW > 120 {
-			m.CustomW = 120
+		if m.CustomW > 200 {
+			m.CustomW = 200
 		}
-		m.FitModeIdx = 1
 
 	case "brightness":
 		m.Brightness += (delta * 5)
@@ -562,18 +573,18 @@ func (m *Model) renderOpts() ascii.Options {
 		availH = 5
 	}
 
-	targetW := m.CustomW
 	autoFit := (m.FitModeIdx == 0)
 
+	var targetW int
 	switch m.FitModeIdx {
-	case 0: // Auto
+	case 0, 3: // Auto, Max
 		targetW = availW
 	case 1: // Compact
 		targetW = 35
 	case 2: // Wide
 		targetW = 55
-	case 3: // Max
-		targetW = availW
+	case fitCustom:
+		targetW = m.CustomW
 	}
 
 	return ascii.Options{

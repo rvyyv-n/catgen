@@ -41,6 +41,60 @@ func sized(m tea.Model) Model {
 	return next.(Model)
 }
 
+func TestWidthAdjustDrivesCustomFitAndRender(t *testing.T) {
+	m := sized(NewModel("images", []string{"a.png"}))
+	m.loadExternal(tempPNG(t, 400, 300))
+
+	// Move the cursor to the "Width" row.
+	for m.menuItems[m.cursor].ID != "width" {
+		next, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = next.(Model)
+	}
+
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = next.(Model)
+	if m.FitModeIdx != fitCustom {
+		t.Fatalf("adjusting Width did not switch to the custom fit mode: FitModeIdx=%d", m.FitModeIdx)
+	}
+	narrow := m.CustomW
+	wNarrow := lipglossW(m.asciiArt)
+
+	for i := 0; i < 6; i++ {
+		next, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+		m = next.(Model)
+	}
+	if m.CustomW <= narrow {
+		t.Fatalf("CustomW did not grow: %d -> %d", narrow, m.CustomW)
+	}
+	if wWide := lipglossW(m.asciiArt); wWide <= wNarrow {
+		t.Errorf("preview width did not track CustomW: %d -> %d", wNarrow, wWide)
+	}
+}
+
+func lipglossW(s string) int {
+	max := 0
+	for _, line := range strings.Split(s, "\n") {
+		w, esc := 0, false
+		for _, r := range line {
+			if r == 0x1b {
+				esc = true
+				continue
+			}
+			if esc {
+				if r == 'm' {
+					esc = false
+				}
+				continue
+			}
+			w++
+		}
+		if w > max {
+			max = w
+		}
+	}
+	return max
+}
+
 func TestOpenImageOverlayLoadsExternalFile(t *testing.T) {
 	m := sized(NewModel("images", []string{"a.png", "b.png"}))
 	startCount := len(m.Images)
